@@ -1,0 +1,38 @@
+
+
+footer
+  .container
+    .seperator
+    .row
+      .col-md-6.col-xs-6.footer-link-column
+        .footer-link-column-row
+          h4 Community
+          ul
+            li: a href="//docs.prediction.io/install/" target="blank" Download
+            li: a href="//docs.prediction.io/" target="blank" Docs
+            li: a href="//github.com/apache/incubator-predictionio" target="blank" GitHub
+            li: a href="mailto:user-subscribe@predictionio.incubator.apache.org" target="blank" Subscribe to User Mailing List
+            li: a href="//stackoverflow.com/questions/tagged/predictionio" target="blank" Stackoverflow
+      .col-md-6.col-xs-6.footer-link-column
+        .footer-link-column-row
+          h4 Contribute
+          ul
+            li: a href="//predictionio.incubator.apache.org/community/contribute-code/" target="blank" Contribute
+            li: a href="//github.com/apache/incubator-predictionio" target="blank" Source Code
+            li: a href="//issues.apache.org/jira/browse/PIO" target="blank" Bug Tracker
+            li: a href="mailto:dev-subscribe@predictionio.incubator.apache.org" target="blank" Subscribe to Development Mailing List
+
+  #footer-bottom
+    .container
+      .row
+        .col-md-12
+          #footer-logo-wrapper
+            = image_tag 'logos/logo-white.png', alt: 'PredictionIO'
+          #social-icons-wrapper
+            a.github-button> href="https://github.com/apache/incubator-predictionio" data-style="mega" data-count-href="/apache/incubator-predictionio/stargazers" data-count-api="/repos/apache/incubator-predictionio#stargazers_count" data-count-aria-label="# stargazers on GitHub" aria-label="Star apache/incubator-predictionio on GitHub" Star
+            a.github-button> href="https://github.com/apache/incubator-predictionio/fork" data-icon="octicon-git-branch" data-style="mega" data-count-href="/apache/incubator-predictionio/network" data-count-api="/repos/apache/incubator-predictionio#forks_count" data-count-aria-label="# forks on GitHub" aria-label="Fork apache/incubator-predictionio on GitHub" Fork
+            script#github-bjs(async defer src="https://buttons.github.io/buttons.js")
+            a> href="//www.facebook.com/predictionio" target="blank"
+              = image_tag 'icons/twitter.png', alt: 'PredictionIO on Twitter'
+            a> href="//twitter.com/predictionio" target="blank"
+              = image_tag 'icons/facebook.png', alt: 'PredictionIO on Facebook'

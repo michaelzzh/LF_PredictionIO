@@ -1,0 +1,81 @@
+##########
+# This is .travis.yml configuration file specifically for master and develop branch.
+# The travis job should contains only unit and integration tests.
+#
+# To avoid this file from being overwritten by .travis.yml from other branches,
+# please add the following to your local git config:
+#   git config merge.ours.driver true
+##########
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+branches:
+  except:
+    - livedoc
+
+language: scala
+
+scala:
+  - 2.10.5
+
+jdk:
+  - oraclejdk8
+
+addons:
+    postgresql: "9.3"
+    apt:
+      packages:
+        - haveged
+
+services:
+  - docker
+
+sudo: required
+
+# cache:
+#   directories:
+#     - $HOME/.ivy2/cache
+#     - $HOME/.sbt/boot
+# before_cache:
+#   - find $HOME/.ivy2 -name "ivydata-*.properties" -delete
+#   - find $HOME/.sbt -name "*.lock" -delete
+
+cache: false
+
+env:
+  global:
+    - PIO_HOME=`pwd`
+
+  matrix:
+    - BUILD_TYPE=Unit
+    - BUILD_TYPE=Integration METADATA_REP=PGSQL EVENTDATA_REP=PGSQL MODELDATA_REP=PGSQL
+    - BUILD_TYPE=Integration METADATA_REP=ELASTICSEARCH EVENTDATA_REP=HBASE MODELDATA_REP=LOCALFS
+    - BUILD_TYPE=Integration METADATA_REP=ELASTICSEARCH EVENTDATA_REP=PGSQL MODELDATA_REP=HDFS
+
+before_install:
+  - unset SBT_OPTS JVM_OPTS
+  - docker pull predictionio/pio-testing
+  - service haveged start
+
+before_script:
+  - ./tests/before_script.travis.sh
+
+script:
+  - ./tests/script.travis.sh
+
+after_script:
+  - ./tests/after_script.travis.sh

@@ -48,6 +48,8 @@ import spray.http.StatusCodes
 import spray.httpx.Json4sSupport
 import spray.routing._
 import spray.routing.authentication.Authentication
+import spray.httpx.SrayJsonSupport
+import spray.json.AdditionalFormats
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -77,6 +79,8 @@ class  EventServiceActor(
   val MaxNumberOfEventsPerBatchRequest = 50
 
   val logger = Logging(context.system, this)
+
+  val userQueryMap = collection.mutable.Map[String, String]()
 
   // we use the enclosing ActorContext's or ActorSystem's dispatcher for our
   // Futures
@@ -141,6 +145,8 @@ class  EventServiceActor(
       new File(s"${pio_root}/engines/base-engine")).!
     registerEngineParam(userName)
 
+    userQueryMap(name) = ""
+
     Future{
       Process(Seq("pio", "app", "new", userName, "--access-key", accessKey)).!
     }
@@ -169,6 +175,35 @@ class  EventServiceActor(
 
     deploy onComplete{
       case _ => System.out.println("Engine deploy completed")
+    }
+  }
+
+  def queryAfterDeploy(port: Int, userName: String, jsString: String) = {
+    val deploy: Future[Int] = Future {
+      val stream = Process(Seq("pio", "deploy", s"--port ${port}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json",
+       s"--variant ${pio_root}/engines/engine-params/${userName}.json"), new File(s"${pio_root}/engines/base-engine")).lines
+      for(x <- stream) {
+        System.out.println(x)
+        if(x.contains("successful")){
+          1
+        }
+      }
+      -1
+    }
+
+    deploy onComplete{
+      case 1 => runQuery(port, jsString)
+    }
+  }
+
+  def runQuery(port: Int, jsString: String) = {
+    val url = s"localhost:${port}/queries.json"
+    val pipeline: HttpRequest => Future[HttpResponse] = sendReceive
+    val response: Future[HttpResponse] = pipeline(
+        Post(url, HttpEntity(ContentTypes.`application/json`, jsString))
+      )
+    response onComplete {completedResponse =>
+      println("Response: " + completedResponse.get.message.entity.asString)
     }
   }
 
@@ -498,6 +533,23 @@ class  EventServiceActor(
                 val port = data.port
                 deployEngine(port, userName)
                 s"deploying engine for ${userName} on port ${port}"
+              }
+            }
+          }
+        }
+      }
+    }~
+    path("engine" / "predict"){
+      import Json4sProtocol._
+      post{
+        handleExceptions(Common.exceptionHandler) {
+          handleRejections(rejectionHandler) {
+            entity(as[QueryData]) {data =>
+              complete {
+                val userName = data.userName
+                val port = data.port
+                val jsString = data.query
+                queryAfterDeploy(port, userName, query)
               }
             }
           }

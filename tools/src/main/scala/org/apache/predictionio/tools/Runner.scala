@@ -196,7 +196,7 @@ object Runner extends Logging {
       detectFilePaths(fs, ca.common.scratchUri, classArgs),
       Seq("--env", pioEnvVars),
       verbose).flatten.filter(_ != "")
-    info(s"Submission command: ${sparkSubmit.mkString(" ")}")
+    //info(s"Submission command: ${sparkSubmit.mkString(" ")}")
     val proc = Process(
       sparkSubmit,
       None,

@@ -21,6 +21,7 @@ libraryDependencies ++= Seq(
   "com.github.nscala-time" %% "nscala-time"    % "2.6.0",
   "commons-codec"           % "commons-codec"  % "1.9",
   "io.spray"               %% "spray-can"      % "1.3.3",
+  "io.spray"               %% "spray-client"   % "1.3.3",
   "io.spray"               %% "spray-routing"  % "1.3.3",
   "io.spray"               %% "spray-testkit"  % "1.3.3" % "test",
   "mysql"                   % "mysql-connector-java" % "5.1.37" % "optional",
@@ -52,6 +53,8 @@ libraryDependencies ++= Seq(
   "org.slf4j"               % "slf4j-log4j12"  % "1.7.18",
   "org.spark-project.akka" %% "akka-actor"     % "2.3.4-spark",
   "org.specs2"             %% "specs2"         % "2.3.13" % "test")
+
+resolvers += "spray repo" at "http://repo.spray.io"
 
 parallelExecution in Test := false
 

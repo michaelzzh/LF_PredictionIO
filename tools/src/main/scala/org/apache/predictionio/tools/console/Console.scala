@@ -895,7 +895,8 @@ object Console extends Logging {
         engineInstances.getLatestCompleted(em.id, em.version, variantId)
       }
       engineInstance map { r =>
-        RunServer.newRunServer(ca, em, r.id)
+        //RunServer.newRunServer(ca, em, r.id)
+        RunServer.newSingleQuery(ca,em,r.id)
       } getOrElse {
         ca.engineInstanceId map { eid =>
           error(

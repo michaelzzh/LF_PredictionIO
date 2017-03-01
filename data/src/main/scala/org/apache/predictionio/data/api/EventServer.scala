@@ -37,6 +37,7 @@ import org.apache.predictionio.data.storage.BatchEventsJson4sSupport
 import org.apache.predictionio.data.storage.LEvents
 import org.apache.predictionio.data.storage.Storage
 import org.apache.predictionio.data.storage.EngineData
+import org.apache.predictionio.data.storage.QueryData
 import org.json4s.DefaultFormats
 import org.json4s.Formats
 import org.json4s.JObject
@@ -48,8 +49,8 @@ import spray.http.StatusCodes
 import spray.httpx.Json4sSupport
 import spray.routing._
 import spray.routing.authentication.Authentication
-import spray.httpx.SrayJsonSupport
-import spray.json.AdditionalFormats
+import spray.httpx.SprayJsonSupport
+import spray.http._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -59,6 +60,16 @@ import sys.process._
 import java.io.File
 import java.io.PrintWriter
 import scala.io.Source
+
+import java.io._
+import org.apache.commons._
+import org.apache.http._
+import org.apache.http.client._
+import org.apache.http.client.methods.HttpPost
+import org.apache.http.impl.client.DefaultHttpClient
+import java.util.ArrayList
+import org.apache.http.message.BasicNameValuePair
+import org.apache.http.client.entity.UrlEncodedFormEntity
 
 class  EventServiceActor(
     val eventClient: LEvents,
@@ -145,7 +156,7 @@ class  EventServiceActor(
       new File(s"${pio_root}/engines/base-engine")).!
     registerEngineParam(userName)
 
-    userQueryMap(name) = ""
+    userQueryMap(userName) = ""
 
     Future{
       Process(Seq("pio", "app", "new", userName, "--access-key", accessKey)).!
@@ -165,7 +176,8 @@ class  EventServiceActor(
        s"--variant ${pio_root}/engines/engine-params/${userName}.json"), new File(s"${pio_root}/engines/base-engine")).lines
       for(x <- stream) {
         System.out.println(x)
-        if(x.contains("successful")){
+        if(x.contains("deployed")){
+          System.out.println("received completed signal")
           1
         }
       }
@@ -184,7 +196,9 @@ class  EventServiceActor(
        s"--variant ${pio_root}/engines/engine-params/${userName}.json"), new File(s"${pio_root}/engines/base-engine")).lines
       for(x <- stream) {
         System.out.println(x)
-        if(x.contains("successful")){
+        if(x.contains("deployed")){
+          System.out.println("received completed signal, started running queries")
+          runQuery(port, jsString)
           1
         }
       }
@@ -192,19 +206,36 @@ class  EventServiceActor(
     }
 
     deploy onComplete{
-      case 1 => runQuery(port, jsString)
+      case _ => s"query complete"
     }
   }
 
-  def runQuery(port: Int, jsString: String) = {
-    val url = s"localhost:${port}/queries.json"
-    val pipeline: HttpRequest => Future[HttpResponse] = sendReceive
-    val response: Future[HttpResponse] = pipeline(
-        Post(url, HttpEntity(ContentTypes.`application/json`, jsString))
-      )
-    response onComplete {completedResponse =>
-      println("Response: " + completedResponse.get.message.entity.asString)
-    }
+  def runQuery(port: Int, attr0: String) = {
+    System.out.println("not implemented")
+    // val url = s"localhost:${port}/queries.json"
+    // val post = new HttpPost(url)
+    // post.addHeader("Content-Type", "application/json")
+
+    // val client = new DefaultHttpClient
+    
+    // val nameValuePairs = new ArrayList[NameValuePair](1)
+    // nameValuePairs.add(new BasicNameValuePair("attr0", attr0))
+    // nameValuePairs.add(new BasicNameValuePair("attr1", attr1))
+    // nameValuePairs.add(new BasicNameValuePair("attr2", attr2))
+    // post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+
+    // val response = client.execute(post)
+
+
+
+
+    // val pipeline: HttpRequest => Future[HttpResponse] = sendReceive
+    // val response: Future[HttpResponse] = pipeline(
+    //     Post(url, HttpEntity(ContentTypes.`application/json`, jsString))
+    //   )
+    // response onComplete {completedResponse =>
+    //   System.out.println("Response: " + completedResponse.get.message.entity.asString)
+    // }
   }
 
   def trainEngine(userName: String) = {
@@ -548,8 +579,9 @@ class  EventServiceActor(
               complete {
                 val userName = data.userName
                 val port = data.port
-                val jsString = data.query
+                val query = data.query
                 queryAfterDeploy(port, userName, query)
+                s"query will be done after deploy"
               }
             }
           }

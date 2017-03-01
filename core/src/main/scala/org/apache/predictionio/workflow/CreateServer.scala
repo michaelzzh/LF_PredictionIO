@@ -500,6 +500,7 @@ class ServerActor[Q, P](
         detach() {
           entity(as[String]) { queryString =>
             try {
+              System.out.println(s"queryString: ${queryString}")
               val servingStartTime = DateTime.now
               val jsonExtractorOption = args.jsonExtractor
               val queryTime = DateTime.now
@@ -602,6 +603,8 @@ class ServerActor[Q, P](
                   predictionJValue
                 }
               } else predictionJValue
+
+              System.out.println(s"PredictionJValue: ${predictionJValue}")
 
               val pluginResult =
                 pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>

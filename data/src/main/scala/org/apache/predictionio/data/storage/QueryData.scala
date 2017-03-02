@@ -4,6 +4,5 @@ import org.apache.predictionio.annotation.DeveloperApi
 
 case class QueryData(
 	val userName: String,
-	val port: Int = 8000,
-	val query: String
+	val properties: List[String] = List()
 )

@@ -190,52 +190,15 @@ class  EventServiceActor(
     }
   }
 
-  def queryAfterDeploy(port: Int, userName: String, jsString: String) = {
-    val deploy: Future[Int] = Future {
-      val stream = Process(Seq("pio", "deploy", s"--port ${port}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json",
+  def runQuery(userName: String, features: String) = {
+    //System.out.println(s"features: $features")
+    val query: Future[Unit] = Future {
+      val stream = Process(Seq("pio", "query", s"--features ${features}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json",
        s"--variant ${pio_root}/engines/engine-params/${userName}.json"), new File(s"${pio_root}/engines/base-engine")).lines
       for(x <- stream) {
         System.out.println(x)
-        if(x.contains("deployed")){
-          System.out.println("received completed signal, started running queries")
-          runQuery(port, jsString)
-          1
-        }
       }
-      -1
     }
-
-    deploy onComplete{
-      case _ => s"query complete"
-    }
-  }
-
-  def runQuery(port: Int, attr0: String) = {
-    System.out.println("not implemented")
-    // val url = s"localhost:${port}/queries.json"
-    // val post = new HttpPost(url)
-    // post.addHeader("Content-Type", "application/json")
-
-    // val client = new DefaultHttpClient
-    
-    // val nameValuePairs = new ArrayList[NameValuePair](1)
-    // nameValuePairs.add(new BasicNameValuePair("attr0", attr0))
-    // nameValuePairs.add(new BasicNameValuePair("attr1", attr1))
-    // nameValuePairs.add(new BasicNameValuePair("attr2", attr2))
-    // post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
-
-    // val response = client.execute(post)
-
-
-
-
-    // val pipeline: HttpRequest => Future[HttpResponse] = sendReceive
-    // val response: Future[HttpResponse] = pipeline(
-    //     Post(url, HttpEntity(ContentTypes.`application/json`, jsString))
-    //   )
-    // response onComplete {completedResponse =>
-    //   System.out.println("Response: " + completedResponse.get.message.entity.asString)
-    // }
   }
 
   def trainEngine(userName: String) = {
@@ -574,14 +537,18 @@ class  EventServiceActor(
       import Json4sProtocol._
       post{
         handleExceptions(Common.exceptionHandler) {
-          handleRejections(rejectionHandler) {
+          handleRejections(rejectionHandler) { 
             entity(as[QueryData]) {data =>
               complete {
+                //val inputs = data.split(":")
                 val userName = data.userName
-                val port = data.port
-                val query = data.query
-                queryAfterDeploy(port, userName, query)
-                s"query will be done after deploy"
+                //val query = inputs(1).substring(0,inputs(1).length()-1).replace('|', ':')
+                var query: String = data.properties.mkString("-")
+                if(data.properties.length == 1){
+                  query = query + "-"
+                }
+                runQuery(userName, query)
+                s"query is being performed"
               }
             }
           }

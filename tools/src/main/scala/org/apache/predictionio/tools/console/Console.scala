@@ -53,12 +53,16 @@ import scala.sys.process._
 import scala.util.Random
 import scalaj.http.Http
 
+import scopt.Read
+import scopt._
+
 case class ConsoleArgs(
   common: CommonArgs = CommonArgs(),
   build: BuildArgs = BuildArgs(),
   app: AppArgs = AppArgs(),
   accessKey: AccessKeyArgs = AccessKeyArgs(),
   deploy: DeployArgs = DeployArgs(),
+  query: QueryArgs = QueryArgs(),
   eventServer: EventServerArgs = EventServerArgs(),
   adminServer: AdminServerArgs = AdminServerArgs(),
   dashboard: DashboardArgs = DashboardArgs(),
@@ -110,6 +114,10 @@ case class DeployArgs(
   port: Int = 8000,
   logUrl: Option[String] = None,
   logPrefix: Option[String] = None)
+
+case class QueryArgs(
+  features: String = ""
+)
 
 case class EventServerArgs(
   enabled: Boolean = false,
@@ -316,6 +324,19 @@ object Console extends Logging {
               failure(s"$x is not a valid json-extractor option [$validOptions]")
             }
           }
+        )
+      note("")
+      cmd("query").
+        text("Query an engine instance").
+        action { (_, c) =>
+          c.copy(commands = c.commands :+ "query")
+        } children(
+          opt[String]("features") action { (x, c) =>
+            c.copy(query = c.query.copy(features = x))
+          } text("features of the query"),
+          opt[String]("accesskey") action { (x, c) =>
+            c.copy(accessKey = c.accessKey.copy(accessKey = x))
+          } text("Access key of the App where feedback data will be stored.")
         )
       note("")
       cmd("deploy").
@@ -732,6 +753,8 @@ object Console extends Logging {
         case Seq("eval") =>
           regenerateManifestJson(ca.common.manifestJson)
           train(ca)
+        case Seq("query") =>
+          query(ca)
         case Seq("deploy") =>
           deploy(ca)
         case Seq("undeploy") =>
@@ -874,7 +897,7 @@ object Console extends Logging {
     }
   }
 
-  def deploy(ca: ConsoleArgs): Int = {
+  def query(ca: ConsoleArgs): Int = {
     Template.verifyTemplateMinVersion(new File("template.json"))
     withRegisteredManifest(
       ca.common.manifestJson,
@@ -897,6 +920,43 @@ object Console extends Logging {
       engineInstance map { r =>
         //RunServer.newRunServer(ca, em, r.id)
         RunServer.newSingleQuery(ca,em,r.id)
+      } getOrElse {
+        ca.engineInstanceId map { eid =>
+          error(
+            s"Invalid engine instance ID ${ca.engineInstanceId}. Aborting.")
+        } getOrElse {
+          error(
+            s"No valid engine instance found for engine ${em.id} " +
+              s"${em.version}.\nTry running 'train' before 'deploy'. Aborting.")
+        }
+        1
+      }
+    }
+  }
+
+  def deploy(ca: ConsoleArgs): Int = {
+    Template.verifyTemplateMinVersion(new File("template.json"))
+    withRegisteredManifest(
+      ca.common.manifestJson,
+      ca.common.engineId,
+      ca.common.engineVersion) { em =>
+      val variantJson = parse(Source.fromFile(ca.common.variantJson).mkString)
+      val variantId = variantJson \ "id" match {
+        case JString(s) => s
+        case _ =>
+          error("Unable to read engine variant ID from " +
+            s"${ca.common.variantJson.getCanonicalPath}. Aborting.")
+          return 1
+      }
+      val engineInstances = storage.Storage.getMetaDataEngineInstances
+      val engineInstance = ca.engineInstanceId map { eid =>
+        engineInstances.get(eid)
+      } getOrElse {
+        engineInstances.getLatestCompleted(em.id, em.version, variantId)
+      }
+      engineInstance map { r =>
+        RunServer.newRunServer(ca, em, r.id)
+        //RunServer.newSingleQuery(ca,em,r.id)
       } getOrElse {
         ca.engineInstanceId map { eid =>
           error(

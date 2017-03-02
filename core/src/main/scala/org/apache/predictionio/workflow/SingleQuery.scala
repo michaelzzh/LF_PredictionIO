@@ -45,6 +45,11 @@ import scala.util.Random
 import scala.util.Success
 import scalaj.http.HttpOptions
 
+import scopt.Read
+import scopt._
+
+import scala.collection.mutable.ListBuffer
+
 class SQKryoInstantiator(classLoader: ClassLoader) extends ScalaKryoInstantiator {
 	def newkryo(): KryoBase = {
 		val kryo = super.newKryo()
@@ -66,12 +71,11 @@ case class QueryConfig(
   engineVariant: String = "",
   eventServerIp: String = "0.0.0.0",
   eventServerPort: Int = 7070,
+  features: String = "",
   batch: String = "",
   engineId: Option[String] = None,
   engineVersion: Option[String] = None,
   env: Option[String] = None,
-  ip: String = "0,0,0,0",
-  port: Int = 8000,
   feedback: Boolean = false,
   accessKey: Option[String] = None,
   logUrl: Option[String] = None,
@@ -100,16 +104,13 @@ object SingleQuery extends Logging {
       		opt[String]("engine-variant") required() action { (x, c) =>
         		c.copy(engineVariant = x)
       		} text("Engine variant JSON.")
-      		opt[String]("ip") action { (x, c) =>
-        		c.copy(ip = x)
-      		}
       		opt[String]("env") action { (x, c) =>
         		c.copy(env = Some(x))
       		} text("Comma-separated list of environmental variables (in 'FOO=BAR' " +
         		"format) to pass to the Spark execution environment.")
-      		opt[Int]("port") action { (x, c) =>
-        		c.copy(port = x)
-      		} text("Port to bind to (default: 8000).")
+      		opt[String]("features") action { (x, c) =>
+      			c.copy(features = x)
+      		} text("Features to be queried with")
       		opt[String]("engineInstanceId") required() action { (x, c) =>
         		c.copy(engineInstanceId = x)
       		} text("Engine instance ID.")
@@ -148,12 +149,17 @@ object SingleQuery extends Logging {
     	parser.parse(args, QueryConfig()) map { qc =>
       	engineInstances.get(qc.engineInstanceId) map { engineInstance =>
         	val engineId = qc.engineId.getOrElse(engineInstance.engineId)
+        	
+        	val featureList = qc.features.split("-").map(s => s"{$s}").toList
+        	//System.out.println(featureList.mkString)
         	val engineVersion = qc.engineVersion.getOrElse(
           	engineInstance.engineVersion)
         	engineManifests.get(engineId, engineVersion) map { manifest =>
           		val engineFactoryName = engineInstance.engineFactory
-         		val result = fetchEngineDataThenQuery(qc, engineInstance, engineFactoryName, manifest)
-         		System.out.println(result)
+         		val results = fetchEngineDataThenQuery(qc, engineInstance, engineFactoryName, manifest, featureList)
+         		for(result <- results){
+         			System.out.println(result)
+         		}
         		} getOrElse {
         	  		error(s"Invalid engine ID or version. Aborting server.")
         		}
@@ -163,54 +169,12 @@ object SingleQuery extends Logging {
     	}
   	}
 
-	def doQuery(
-		engineInstanceId: String = "",
-		engineVariant: String = "",
-		eventServerIp: String = "0,0,0,0",
-		eventServerPort:Int = 7070): Int = {
-
-		System.out.println("doQuery received command")
-
-		val qc = QueryConfig(engineInstanceId, engineVariant, eventServerIp, eventServerPort)
-
-		WorkflowUtils.modifyLogging(qc.verbose)
-      	engineInstances.get(qc.engineInstanceId) map { engineInstance =>
-        val engineId = qc.engineId.getOrElse(engineInstance.engineId)
-        val engineVersion = qc.engineVersion.getOrElse(
-          engineInstance.engineVersion)
-
-        engineManifests.get(engineId, engineVersion) map { manifest =>
-        val engineFactoryName = engineInstance.engineFactory
-        val result = fetchEngineDataThenQuery(qc, engineInstance, engineFactoryName, manifest)
-        System.out.println()
-        //   val master = actorSystem.actorOf(Props(
-        //     classOf[MasterActor],
-        //     sc,
-        //     engineInstance,
-        //     engineFactoryName,
-        //     manifest),
-        //   "master")
-        //   implicit val timeout = Timeout(5.seconds)
-        //   master ? StartServer()
-        //   actorSystem.awaitTermination
-         s"within doQuery"
-         1
-        } getOrElse {
-          s"Invalid engine ID or version. Aborting query."
-          0
-        }
-      } getOrElse {
-        s"Invalid engine instance ID. Aborting query."
-        0
-      }
-
-	}
-
   def fetchEngineDataThenQuery(
   	qc: QueryConfig,
   	engineInstance: EngineInstance,
   	engineFactoryName: String,
-  	manifest: EngineManifest): String = {
+  	manifest: EngineManifest,
+  	queryStrings: List[String]): List[String] = {
 
   	val (engineLanguage, engineFactory) = WorkflowUtils.getEngine(engineFactoryName, getClass.getClassLoader)
   	val engine = engineFactory()
@@ -221,7 +185,7 @@ object SingleQuery extends Logging {
 
   	val deployableEngine = engine.asInstanceOf[Engine[_,_,_,_,_,_]]
 
-  	runQueryWithEngine(qc, engineInstance, deployableEngine, engineLanguage, manifest)
+  	runQueryWithEngine(qc, engineInstance, deployableEngine, engineLanguage, manifest, queryStrings)
   }
 
 
@@ -230,7 +194,8 @@ object SingleQuery extends Logging {
   	engineInstance: EngineInstance,
   	engine: Engine[TD, EIN, PD, Q, P, A],
   	engineLanguage: EngineLanguage.Value,
-  	manifest: EngineManifest): String = {
+  	manifest: EngineManifest,
+  	queryStrings: List[String]): List[String] = {
   	val engineParams = engine.engineInstanceToEngineParams(engineInstance, qc.jsonExtractor)
 
   	val kryo = SQKryoInstantiator.newKryoInjection
@@ -280,7 +245,7 @@ object SingleQuery extends Logging {
   		models,
   		serving,
   		engineParams.servingParams._2,
-  		"{\"attr0\": 0, \"attr1\": 1, \"attr2\": 1}")
+  		queryStrings)
   }
   def predict[Q, P](
   	args: QueryConfig,
@@ -295,7 +260,7 @@ object SingleQuery extends Logging {
   	models: Seq[Any],
   	serving: BaseServing[Q, P],
   	servingParams: Params,
-  	queryString: String): String = {
+  	queryStrings: List[String]): List[String] = {
 
   	var requestCount: Int = 0
   	var avgServingSec: Double = 0.0
@@ -314,92 +279,100 @@ object SingleQuery extends Logging {
   	val jsonExtractorOption = args.jsonExtractor
   	val queryTime = DateTime.now
 
-  	val query = JsonExtractor.extract(
-  		jsonExtractorOption,
-  		queryString,
-  		algorithms.head.queryClass,
-  		algorithms.head.querySerializer,
-  		algorithms.head.gsonTypeAdapterFactories
-  	)
+  	var fetchedPredictions = new ListBuffer[String]()
 
-  	val queryJValue = JsonExtractor.toJValue(
-  		jsonExtractorOption,
-  		query,
-  		algorithms.head.querySerializer,
-  		algorithms.head.gsonTypeAdapterFactories)
+  	for(queryString <- queryStrings){
+  		val query = JsonExtractor.extract(
+  			jsonExtractorOption,
+  			queryString,
+  			algorithms.head.queryClass,
+  			algorithms.head.querySerializer,
+  			algorithms.head.gsonTypeAdapterFactories
+  		)
 
-  	val supplementedQuery = serving.supplementBase(query)
+  		val queryJValue = JsonExtractor.toJValue(
+  			jsonExtractorOption,
+  			query,
+  			algorithms.head.querySerializer,
+  			algorithms.head.gsonTypeAdapterFactories)
 
-  	val predictions = algorithms.zipWithIndex.map {case (a, ai) =>
-  		a.predictBase(models(ai), supplementedQuery)
-  	}
+  		val supplementedQuery = serving.supplementBase(query)
 
-  	val prediction = serving.serveBase(query, predictions)
-  	val predictionJValue = JsonExtractor.toJValue(
-  		jsonExtractorOption,
-  		prediction,
-  		algorithms.head.querySerializer,
-  		algorithms.head.gsonTypeAdapterFactories)
-
-  	val result = if(feedbackEnabled) {
-  		implicit val formats = 
-  			algorithms.headOption map { alg =>
-  				alg.querySerializer
-  			} getOrElse {
-  				Utils.json4sDefaultFormats
-  			}
-  		def genPrId: String = Random.alphanumeric.take(64).mkString
-  		val newPrId = prediction match {
-  			case id: WithPrId =>
-  				val org = id.prId
-  				if (org.isEmpty) genPrId else org
-  			case _ => genPrId
+  		val predictions = algorithms.zipWithIndex.map {case (a, ai) =>
+  			a.predictBase(models(ai), supplementedQuery)
   		}
 
-  		val queryPrId = 
-  			query match {
+  		val prediction = serving.serveBase(query, predictions)
+  		val predictionJValue = JsonExtractor.toJValue(
+  			jsonExtractorOption,
+  			prediction,
+  			algorithms.head.querySerializer,
+  			algorithms.head.gsonTypeAdapterFactories)
+
+  		val result = if(feedbackEnabled) {
+  			implicit val formats = 
+  				algorithms.headOption map { alg =>
+  					alg.querySerializer
+  				} getOrElse {
+  					Utils.json4sDefaultFormats
+  				}
+  			def genPrId: String = Random.alphanumeric.take(64).mkString
+  			val newPrId = prediction match {
   				case id: WithPrId =>
-  					Map("prId" -> id.prId)
-  				case _ =>
-  					Map()
+  					val org = id.prId
+  					if (org.isEmpty) genPrId else org
+  				case _ => genPrId
+  			}	
+
+  			val queryPrId = 
+  				query match {
+  					case id: WithPrId =>
+  						Map("prId" -> id.prId)
+  					case _ =>
+  						Map()
+  				}
+  			val data = Map(
+  				"event" -> "predict",
+  				"eventTime" -> queryTime.toString(),
+  				"entityType" -> "pio_pr",
+  				"entityId" -> newPrId,
+  				"properties" -> Map(
+  					"engineInstanceid" -> engineInstance.id,
+  					"query" -> query,
+  					"prediction" -> prediction)) ++ queryPrId
+
+  			val accessKey = args.accessKey.getOrElse("")
+  			val f: Future[Int] = future {
+  				scalaj.http.Http(
+  					s"http://${args.eventServerIp}:${args.eventServerPort}/" +
+  					s"events.json?accessKey=$accessKey").postData(
+  					write(data)).header(
+  					"content-type", "application/json").asString.code
   			}
-  		val data = Map(
-  			"event" -> "predict",
-  			"eventTime" -> queryTime.toString(),
-  			"entityType" -> "pio_pr",
-  			"entityId" -> newPrId,
-  			"properties" -> Map(
-  				"engineInstanceid" -> engineInstance.id,
-  				"query" -> query,
-  				"prediction" -> prediction)) ++ queryPrId
 
-  		val accessKey = args.accessKey.getOrElse("")
-  		val f: Future[Int] = future {
-  			scalaj.http.Http(
-  				s"http://${args.eventServerIp}:${args.eventServerPort}/" +
-  				s"events.json?accessKey=$accessKey").postData(
-  				write(data)).header(
-  				"content-type", "application/json").asString.code
-  		}
-
- 		f onComplete {
- 			case Success(code) => {
- 				if (code != 201) {
- 					System.out.println(s"Feedback event failed. Status code; $code."
- 						+ s"Data: ${write{data}}")
+ 			f onComplete {
+ 				case Success(code) => {
+ 					if (code != 201) {
+ 						System.out.println(s"Feedback event failed. Status code; $code."
+ 							+ s"Data: ${write{data}}")
+ 					}
+ 				}
+ 				case Failure(t) => {
+ 					System.out.println(s"Feedback event failed; ${t.getMessage}")
  				}
  			}
- 			case Failure(t) => {
- 				System.out.println(s"Feedback event failed; ${t.getMessage}")
- 			}
- 		}
 
- 		if (prediction.isInstanceOf[WithPrId]) {
- 			predictionJValue merge parse(s"""{"prId" : "$newPrId"}""")
- 		} else {
- 			predictionJValue
- 		}
-  	} else predictionJValue
+ 			if (prediction.isInstanceOf[WithPrId]) {
+ 				predictionJValue merge parse(s"""{"prId" : "$newPrId"}""")
+ 			} else {
+ 				predictionJValue
+ 			}
+  		} else predictionJValue
+
+  		fetchedPredictions += compact(render(predictionJValue))
+  	}
+
+
 
   	val servingEndTime = DateTime.now
   	lastServingSec = 
@@ -408,7 +381,7 @@ object SingleQuery extends Logging {
   		((avgServingSec * requestCount) + lastServingSec) / (requestCount + 1)
   	requestCount += 1
 
-  	compact(render(predictionJValue))
+  	fetchedPredictions.toList
   }
 
 }

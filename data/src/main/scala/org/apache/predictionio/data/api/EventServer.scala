@@ -230,6 +230,7 @@ class  EventServiceActor(
     val writer = new PrintWriter(tempFile)
     Source.fromFile(engineFile).getLines
       .map { x => if(x.contains("\"appName\"")) "      \"appName\": \""+userName+"\","
+                  else if(x.contains("\"id\"")) "  \"id\": \"default\""
                   else x}
       .foreach(x => writer.println(x))
     writer.close()

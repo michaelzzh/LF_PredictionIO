@@ -93,6 +93,13 @@ class JDBCEngineInstances(client: String, config: StorageClientConfig, prefix: S
       single().apply()
   }
 
+  def getBaseEngines(): Seq[String] = DB localTx { implicit session =>
+    sql"""
+    SELECT
+      engineId,
+    FROM $tableName WHERE engineVariant = 'base'""".map(resultToEngineId).list().apply().distinct
+  }
+
   def getAll(): Seq[EngineInstance] = DB localTx { implicit session =>
     sql"""
     SELECT
@@ -193,5 +200,9 @@ class JDBCEngineInstances(client: String, config: StorageClientConfig, prefix: S
       preparatorParams = rs.string("preparatorParams"),
       algorithmsParams = rs.string("algorithmsParams"),
       servingParams = rs.string("servingParams"))
+  }
+
+  def resultToEngineId(rs: WrappedResultSet): String = {
+    rs.string("engineId")
   }
 }

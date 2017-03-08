@@ -41,6 +41,7 @@ import scala.language.existentials
 object CreateWorkflow extends Logging {
 
   case class WorkflowConfig(
+    preDeployment: Boolean = false,
     deployMode: String = "",
     batch: String = "",
     engineId: String = "",
@@ -76,6 +77,9 @@ object CreateWorkflow extends Logging {
 
   val parser = new scopt.OptionParser[WorkflowConfig]("CreateWorkflow") {
     override def errorOnUnknownArgument: Boolean = false
+    opt[String]("pre-deployment") action { (x, c) =>
+      c.copy(preDeployment = true)
+    } text("Batch label of the workflow run.")
     opt[String]("batch") action { (x, c) =>
       c.copy(batch = x)
     } text("Batch label of the workflow run.")
@@ -248,6 +252,7 @@ object CreateWorkflow extends Logging {
         engineInstance)
 
       CoreWorkflow.runTrain(
+        wfc.preDeployment,
         env = pioEnvVars,
         params = workflowParams,
         engine = trainableEngine,

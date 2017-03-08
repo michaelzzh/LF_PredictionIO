@@ -43,6 +43,7 @@ object CoreWorkflow {
     Storage.getMetaDataEvaluationInstances()
 
   def runTrain[EI, Q, P, A](
+      preDeployment: Boolean = false,
       engine: BaseEngine[EI, Q, P, A],
       engineParams: EngineParams,
       engineInstance: EngineInstance,
@@ -63,8 +64,8 @@ object CoreWorkflow {
       mode.capitalize)
 
     try {
-
-      val models: Seq[Any] = engine.train(
+      if(!preDeployment){
+        val models: Seq[Any] = engine.train(
         sc = sc,
         engineParams = engineParams,
         engineInstanceId = engineInstance.id,
@@ -79,15 +80,21 @@ object CoreWorkflow {
       Storage.getModelDataModels.insert(Model(
         id = engineInstance.id,
         models = kryo(models)))
+      }
 
+      
       logger.info("Updating engine instance")
-      val engineInstances = Storage.getMetaDataEngineInstances
+      val getMetaDataEngineInstances = Storage.getMetaDataEngineInstances
       engineInstances.update(engineInstance.copy(
         status = "COMPLETED",
         endTime = DateTime.now
         ))
-
-      logger.info("Training completed successfully.")
+      if(!preDeployment){
+        logger.info("Training completed successfully.")
+      }else{
+        logger.info(s"Engine ${engineInstance.id} is ready for deploy")
+      }
+      
     } catch {
       case e @(
           _: StopAfterReadInterruption |

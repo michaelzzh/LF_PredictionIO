@@ -204,6 +204,7 @@ object RunWorkflow extends Logging {
         .map(x => Seq("--engine-params-generator-class", x))
         .getOrElse(Seq()) ++
       (if (ca.common.batch != "") Seq("--batch", ca.common.batch) else Seq()) ++
+      (if (ca.common.preDeployment) Seq("--pre-deployment") else Seq()) ++
       Seq("--json-extractor", ca.common.jsonExtractor.toString)
 
     Runner.runOnSpark(

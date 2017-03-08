@@ -75,7 +75,6 @@ trait EngineInstances {
 
   /** Get all [[EngineInstance]]s */
   def getAll(): Seq[EngineInstance]
-
   /** Get an instance that has started training the latest and has trained to
     * completion
     */

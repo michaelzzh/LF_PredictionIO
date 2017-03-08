@@ -1,5 +1,5 @@
 {
-  "id": "default",
+  "id": "base",
   "description": "Default settings",
   "engineFactory": "com.laserfiche.ClassificationEngine",
   "datasource": {

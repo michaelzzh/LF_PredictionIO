@@ -26,6 +26,7 @@ import org.apache.predictionio.data.storage.EngineManifest
 import org.apache.predictionio.tools.console.ConsoleArgs
 import org.apache.predictionio.workflow.WorkflowUtils
 import org.apache.predictionio.workflow.SingleQuery
+import scala.collection.mutable.ListBuffer
 
 import scala.sys.process._
 
@@ -155,8 +156,6 @@ object RunServer extends Logging {
     val args = Seq(
       "--engineInstanceId",
       engineInstanceId,
-      "--engine-variant",
-      ca.common.variantJson.toURI.toString,
       "--features",
       ca.query.features,
       "--event-server-ip",
@@ -178,6 +177,44 @@ object RunServer extends Logging {
     //SingleQuery.doQuery(engineInstanceId, ca.common.variantJson.toURI.toString, ca.eventServer.ip, ca.eventServer.port);
 
     Runner.runOnSpark("org.apache.predictionio.workflow.SingleQuery", args, ca, jarFiles)
+  }
+
+  def newGroupQuery(
+    ca: ConsoleArgs,
+    emList: List[EngineManifest],
+    engineInstanceIdList: String): Int = {
+    var jarFileList = Array[URI]()
+    for(em <- emList){
+      val jarFiles = em.files.map(new URI(_)) ++
+      Option(new File(ca.common.pioHome.get, "plugins").listFiles())
+        .getOrElse(Array.empty[File]).map(_.toURI)
+      jarFileList = jarFileList ++ jarFiles
+    }
+    
+    val args = Seq(
+      "--engineInstanceIds",
+      engineInstanceIdList,
+      "--features",
+      ca.query.features,
+      "--event-server-ip",
+      ca.eventServer.ip,
+      "--event-server-port",
+      ca.eventServer.port.toString) ++
+      (if (ca.accessKey.accessKey != "") {
+        Seq("--accesskey", ca.accessKey.accessKey)
+      } else {
+        Nil
+      }) ++
+      (if (ca.eventServer.enabled) Seq("--feedback") else Nil) ++
+      (if (ca.common.batch != "") Seq("--batch", ca.common.batch) else Nil) ++
+      (if (ca.common.verbose) Seq("--verbose") else Nil) ++
+      ca.deploy.logUrl.map(x => Seq("--log-url", x)).getOrElse(Nil) ++
+      ca.deploy.logPrefix.map(x => Seq("--log-prefix", x)).getOrElse(Nil) ++
+      Seq("--json-extractor", ca.common.jsonExtractor.toString)
+
+    //SingleQuery.doQuery(engineInstanceId, ca.common.variantJson.toURI.toString, ca.eventServer.ip, ca.eventServer.port);
+
+    Runner.runOnSpark("org.apache.predictionio.workflow.SingleQuery", args, ca, jarFileList)
   }
 
   def newRunServer(
@@ -212,6 +249,6 @@ object RunServer extends Logging {
       ca.deploy.logPrefix.map(x => Seq("--log-prefix", x)).getOrElse(Nil) ++
       Seq("--json-extractor", ca.common.jsonExtractor.toString)
 
-    Runner.runOnSpark("org.apache.predictionio.workflow.CreateServer", args, ca, jarFiles)
+    Runner.runOnSpark("org.apache.predictionio.workflow.EngineServer", args, ca, jarFiles)
   }
 }

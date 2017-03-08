@@ -68,7 +68,6 @@ object SQKryoInstantiator extends Serializable {
 
 case class QueryConfig(
   engineInstanceId: String = "",
-  engineVariant: String = "",
   eventServerIp: String = "0.0.0.0",
   eventServerPort: Int = 7070,
   features: String = "",
@@ -101,9 +100,6 @@ object SingleQuery extends Logging {
       		opt[String]("engineVersion") action { (x, c) =>
         		c.copy(engineVersion = Some(x))
       		} text("Engine version.")
-      		opt[String]("engine-variant") required() action { (x, c) =>
-        		c.copy(engineVariant = x)
-      		} text("Engine variant JSON.")
       		opt[String]("env") action { (x, c) =>
         		c.copy(env = Some(x))
       		} text("Comma-separated list of environmental variables (in 'FOO=BAR' " +
@@ -111,7 +107,7 @@ object SingleQuery extends Logging {
       		opt[String]("features") action { (x, c) =>
       			c.copy(features = x)
       		} text("Features to be queried with")
-      		opt[String]("engineInstanceId") required() action { (x, c) =>
+      		opt[String]("engineInstanceIds") required() action { (x, c) =>
         		c.copy(engineInstanceId = x)
       		} text("Engine instance ID.")
       		opt[Unit]("feedback") action { (_, c) =>
@@ -147,25 +143,29 @@ object SingleQuery extends Logging {
     	}
 
     	parser.parse(args, QueryConfig()) map { qc =>
-      	engineInstances.get(qc.engineInstanceId) map { engineInstance =>
-        	val engineId = qc.engineId.getOrElse(engineInstance.engineId)
-        	
-        	val featureList = qc.features.split("-").map(s => s"{$s}").toList
-        	//System.out.println(featureList.mkString)
-        	val engineVersion = qc.engineVersion.getOrElse(
-          	engineInstance.engineVersion)
-        	engineManifests.get(engineId, engineVersion) map { manifest =>
-          		val engineFactoryName = engineInstance.engineFactory
-         		val results = fetchEngineDataThenQuery(qc, engineInstance, engineFactoryName, manifest, featureList)
-         		for(result <- results){
-         			System.out.println(result)
-         		}
-        		} getOrElse {
-        	  		error(s"Invalid engine ID or version. Aborting server.")
-        		}
-      		} getOrElse {
-        		error(s"Invalid engine instance ID. Aborting server.")
-      		}
+
+    		val featureList = qc.features.split("!").toList
+    		val engineInstanceIdList = qc.engineInstanceId.split("&").toList
+    		for ((ft, eId) <- (featureList zip engineInstanceIdList)) {
+    			engineInstances.get(eId) map { engineInstance =>
+        			val engineId = engineInstance.engineId
+        			val singleFeatureList = ft.split("-").toList
+        			//System.out.println(featureList.mkString)
+        			val engineVersion = qc.engineVersion.getOrElse(
+          			engineInstance.engineVersion)
+        			engineManifests.get(engineId, engineVersion) map { manifest =>
+          				val engineFactoryName = engineInstance.engineFactory
+         				val results = fetchEngineDataThenQuery(qc, engineInstance, engineFactoryName, manifest, singleFeatureList)
+         				for(result <- results){
+         					System.out.println(s"query for ${engineId}: ${result}")
+         				}
+        			} getOrElse {
+        	  			error(s"Invalid engine ID or version. Aborting server.")
+        			}
+      			} getOrElse {
+        			error(s"Invalid engine instance ID ${eId}. Aborting server.")
+      			}
+	    	}
     	}
   	}
 
@@ -196,6 +196,7 @@ object SingleQuery extends Logging {
   	engineLanguage: EngineLanguage.Value,
   	manifest: EngineManifest,
   	queryStrings: List[String]): List[String] = {
+  	System.out.println("runQueryWithEngine")
   	val engineParams = engine.engineInstanceToEngineParams(engineInstance, qc.jsonExtractor)
 
   	val kryo = SQKryoInstantiator.newKryoInjection
@@ -203,17 +204,20 @@ object SingleQuery extends Logging {
   	val modelsFromEngineInstance = 
   		kryo.invert(modeldata.get(engineInstance.id).get.models).get.asInstanceOf[Seq[Any]]
 
+  	System.out.println("kryo done")
   	val batch = if (engineInstance.batch.nonEmpty) {
   		s"${engineInstance.engineFactory} (${engineInstance.batch})"
   	}else{
   		engineInstance.engineFactory
   	}
-
+  	System.out.println(s"batch: ${batch}, executorEnv: ${engineInstance.env}, sparkEnv: ${engineInstance.sparkConf}")
   	val sparkContext = WorkflowContext(
   		batch = batch,
   		executorEnv = engineInstance.env,
   		mode = "Serving",
   		sparkEnv = engineInstance.sparkConf)
+
+  	System.out.println("sparkcontext done")
 
   	val models = engine.prepareDeploy(
   		sparkContext,

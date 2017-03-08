@@ -90,9 +90,6 @@ class  EventServiceActor(
   val MaxNumberOfEventsPerBatchRequest = 50
 
   val logger = Logging(context.system, this)
-
-  val userQueryMap = collection.mutable.Map[String, String]()
-
   // we use the enclosing ActorContext's or ActorSystem's dispatcher for our
   // Futures
   implicit def executionContext: ExecutionContext = context.dispatcher
@@ -151,12 +148,22 @@ class  EventServiceActor(
       }
   }
 
-  def registerUser(userName: String, accessKey: String):String = {
-    Process(Seq("pio", "register", s"--userName ${userName}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json"),
+  def startUpBaseEngines(): Unit = {
+    val allEngines = Storage.getMetaDataEngineInstances.getAll
+    val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
+    for(engine <- baseEngines){
+      Future{
+        Process(Seq("pio", "deploy", s"--manifest ${pio_root}/engines/engine-manifests/${engine}.json",
+          s"--variant ${pio_root}/engines/engine-params/${engine}.json")).!
+      }
+      System.out.println(s"Starting up base engine ${engine}")
+    } 
+  }
+
+  def registerEngine(userName: String, accessKey: String):String = {
+    Process(Seq("pio", "register", s"--engine-id ${userName}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json"),
       new File(s"${pio_root}/engines/base-engine")).!
     registerEngineParam(userName)
-
-    userQueryMap(userName) = ""
 
     Future{
       Process(Seq("pio", "app", "new", userName, "--access-key", accessKey)).!
@@ -190,11 +197,11 @@ class  EventServiceActor(
     }
   }
 
-  def runQuery(userName: String, features: String) = {
+  def runQuery(userName: String, features: String, engineIds: String) = {
     //System.out.println(s"features: $features")
     val query: Future[Unit] = Future {
       val stream = Process(Seq("pio", "query", s"--features ${features}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json",
-       s"--variant ${pio_root}/engines/engine-params/${userName}.json"), new File(s"${pio_root}/engines/base-engine")).lines
+       s"--variant ${pio_root}/engines/engine-params/${userName}.json", s"--engine-id-list ${engineIds}", s"--engine-version ${userName}"), new File(s"${pio_root}/engines/base-engine")).lines
       for(x <- stream) {
         System.out.println(x)
       }
@@ -211,14 +218,14 @@ class  EventServiceActor(
 
     training onComplete {
       case Success(userName) => {
-
+  
       }
       case Failure(t) => println("An error has occured at train: " + t.getMessage)
     }
   }
 
   def registerEngineParam(userName: String) = {
-    val engineFile = new File(s"${pio_root}/engines/engine-params/engine.json")
+    val engineFile = new File(s"${pio_root}/engines/engine-params/baseClassification.json")
     val tempFile = new File(s"${pio_root}/engines/engine-params/${userName}.json")
     val writer = new PrintWriter(tempFile)
     Source.fromFile(engineFile).getLines
@@ -481,7 +488,7 @@ class  EventServiceActor(
               complete {
                 val userName = data.userName
                 val accessKey = data.accessKey
-                registerUser(userName, accessKey)
+                registerEngine(userName, accessKey)
               }
             }
           }
@@ -541,13 +548,17 @@ class  EventServiceActor(
             entity(as[QueryData]) {data =>
               complete {
                 //val inputs = data.split(":")
-                val userName = data.userName
-                //val query = inputs(1).substring(0,inputs(1).length()-1).replace('|', ':')
-                var query: String = data.properties.mkString("-")
-                if(data.properties.length == 1){
-                  query = query + "-"
-                }
-                runQuery(userName, query)
+                // val userName = data.userName
+                // var engineIds = data.engineIds.mkString("-")
+                // if(data.engineIds.length == 1){
+                //   engineIds = engineIds + "-"
+                // }
+                // //val query = inputs(1).substring(0,inputs(1).length()-1).replace('|', ':')
+                // var query: String = data.properties.mkString("!")
+                // if(data.properties.length == 1){
+                //   query = query + "!"
+                // }
+                // runQuery(userName, query, engineIds)
                 s"query is being performed"
               }
             }
@@ -753,7 +764,10 @@ class  EventServiceActor(
 
     }
 
-  def receive: Actor.Receive = runRoute(route)
+  def receive: Actor.Receive = {
+    startUpBaseEngines()
+    runRoute(route)
+  }
 }
 
 

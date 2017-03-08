@@ -98,10 +98,11 @@ object Runner extends Logging {
       ca: ConsoleArgs,
       extraJars: Seq[URI]): Int = {
     // Return error for unsupported cases
-    val deployMode =
+    info(s"run on spark")
+    val deployMode = 
       argumentValue(ca.common.sparkPassThrough, "--deploy-mode").getOrElse("client")
     val master =
-      argumentValue(ca.common.sparkPassThrough, "--master").getOrElse("local")
+      argumentValue(ca.common.sparkPassThrough, "--master").getOrElse("local[*]")
 
     (ca.common.scratchUri, deployMode, master) match {
       case (Some(u), "client", m) if m != "yarn-cluster" =>
@@ -117,6 +118,7 @@ object Runner extends Logging {
     val fs = ca.common.scratchUri map { uri =>
       FileSystem.get(uri, new Configuration())
     }
+    //val fs = ca.common.scratchUri
 
     // Collect and serialize PIO_* environmental variables
     val pioEnvVars = sys.env.filter(kv => kv._1.startsWith("PIO_")).map(kv =>
@@ -197,6 +199,7 @@ object Runner extends Logging {
       Seq("--env", pioEnvVars),
       verbose).flatten.filter(_ != "")
     //info(s"Submission command: ${sparkSubmit.mkString(" ")}")
+    info(s"spark submit received")
     val proc = Process(
       sparkSubmit,
       None,

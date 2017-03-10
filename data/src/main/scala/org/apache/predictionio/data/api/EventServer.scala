@@ -165,7 +165,7 @@ class  EventServiceActor(
 
   def registerEngine(engineId: String, accessKey: String, baseEngine: String):String = {
     Process(Seq("pio", "register", s"--engine-id ${engineId}", s"--base-engine-uri ${pio_root}/engines/${baseEngine}"),
-      new File(s"${pio_root}/engines/baseClassification")).!
+      new File(s"${pio_root}/engines/${baseEngine}")).!
     //registerEngineParam(engineId)
 
     Future{
@@ -189,7 +189,7 @@ class  EventServiceActor(
         s"--base-engine-uri ${pio_root}/engines/${baseEngine}", 
         s"--base-engine-id ${baseEngine}",
         s"--variant ${pio_root}/engines/engine-params/${engineId}.json"), 
-      new File(s"${pio_root}/engines/baseClassification")).lines
+      new File(s"${pio_root}/engines/${baseEngine}")).lines
       
       stream foreach println
       engineId

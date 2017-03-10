@@ -30,17 +30,15 @@ class DataSource(val dsp: DataSourceParams)
       appName = dsp.appName,
       entityType = "user",
       // only keep entities with these required properties defined
-      required = Some(List("plan", "attr0", "attr1", "attr2")))(sc)
+      required = Some(List("label", "features")))(sc)
       // aggregateProperties() returns RDD pair of
       // entity ID and its aggregated properties
       .map { case (entityId, properties) =>
         try {
-          LabeledPoint(properties.get[Double]("plan"),
-            Vectors.dense(Array(
-              properties.get[Double]("attr0"),
-              properties.get[Double]("attr1"),
-              properties.get[Double]("attr2")
-            ))
+          LabeledPoint(properties.get[Double]("label"),
+            Vectors.dense(
+              properties.get[Array[Double]]("features")
+            )
           )
         } catch {
           case e: Exception => {
@@ -68,17 +66,15 @@ class DataSource(val dsp: DataSourceParams)
       appName = dsp.appName,
       entityType = "user",
       // only keep entities with these required properties defined
-      required = Some(List("plan", "attr0", "attr1", "attr2")))(sc)
+      required = Some(List("label", "features")))(sc)
       // aggregateProperties() returns RDD pair of
       // entity ID and its aggregated properties
       .map { case (entityId, properties) =>
         try {
-          LabeledPoint(properties.get[Double]("plan"),
-            Vectors.dense(Array(
-              properties.get[Double]("attr0"),
-              properties.get[Double]("attr1"),
-              properties.get[Double]("attr2")
-            ))
+          LabeledPoint(properties.get[Double]("labels"),
+            Vectors.dense(
+              properties.get[Array[Double]]("features")
+            )
           )
         } catch {
           case e: Exception => {
@@ -102,7 +98,7 @@ class DataSource(val dsp: DataSourceParams)
         new TrainingData(trainingPoints),
         new EmptyEvaluationInfo(),
         testingPoints.map {
-          p => (new Query(p.features(0), p.features(1), p.features(2)), new ActualResult(p.label))
+          p => (new Query(p.features.toArray), new ActualResult(p.label))
         }
       )
     }

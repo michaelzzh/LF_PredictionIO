@@ -4,9 +4,7 @@ import org.apache.predictionio.controller.EngineFactory
 import org.apache.predictionio.controller.Engine
 
 class Query(
-  val attr0 : Double,
-  val attr1 : Double,
-  val attr2 : Double
+  val features : Array[Double]
 ) extends Serializable
 
 class PredictedResult(

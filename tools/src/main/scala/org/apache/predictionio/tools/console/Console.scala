@@ -866,7 +866,7 @@ object Console extends Logging {
     //   ca.common.manifestJson,
     //   jarFiles,
     //   false)
-    info("Your engine is built, still need to run pio register --manifest{} --variant{} to make engine deployable.")
+    info("Your engine is built, still need to run pio register --engine-id{} --variant{} to make engine deployable.")
     0
   }
 

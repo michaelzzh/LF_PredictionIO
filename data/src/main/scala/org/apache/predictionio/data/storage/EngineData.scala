@@ -3,7 +3,7 @@ package org.apache.predictionio.data.storage
 import org.apache.predictionio.annotation.DeveloperApi
 
 case class EngineData(
-	val userName: String,
+	val engineId: String,
 	val accessKey: String,
-	val port: Int = 8000
+	val baseEngine: String
 )

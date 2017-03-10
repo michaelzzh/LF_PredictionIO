@@ -36,6 +36,14 @@ object RegisterEngine extends Logging {
   val engineManifests = Storage.getMetaDataEngineManifests
   implicit val formats = DefaultFormats + new EngineManifestSerializer
 
+  def registerEngineWithManifest(
+    manifest: EngineManifest,
+    engineFiles: Seq[File]): Unit = {
+    info(s"Registering engine ${manifest.id} ${manifest.version}")
+    engineManifests.update(
+      manifest.copy(files = engineFiles.map(_.toURI.toString)), true)
+  }
+
   def registerEngine(
       jsonManifest: File,
       engineFiles: Seq[File],

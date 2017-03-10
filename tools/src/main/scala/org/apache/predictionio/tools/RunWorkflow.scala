@@ -146,8 +146,6 @@ object RunWorkflow extends Logging {
         },
         "--verbosity",
         ca.common.verbosity.toString) ++
-      ca.common.engineFactory.map(
-        x => Seq("--engine-factory", x)).getOrElse(Seq()) ++
       ca.common.engineParamsKey.map(
         x => Seq("--engine-params-key", x)).getOrElse(Seq()) ++
       (if (deployMode == "cluster") Seq("--deploy-mode", "cluster") else Seq()) ++
@@ -180,12 +178,14 @@ object RunWorkflow extends Logging {
       em.id,
       "--engine-version",
       em.version,
+      "--base-engine-id",
+      ca.common.baseEngineId,
+      "--base-engine-uri",
+      ca.common.baseEngineURI,
       "--engine-variant",
       ca.common.variantJson.toURI.toString,
       "--verbosity",
       ca.common.verbosity.toString) ++
-      ca.common.engineFactory.map(
-        x => Seq("--engine-factory", x)).getOrElse(Seq()) ++
       ca.common.engineParamsKey.map(
         x => Seq("--engine-params-key", x)).getOrElse(Seq()) ++
       (if (ca.common.batch != "") Seq("--batch", ca.common.batch) else Seq()) ++

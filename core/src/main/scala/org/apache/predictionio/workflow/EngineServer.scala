@@ -218,6 +218,15 @@ object EngineServer extends Logging {
       mode = "Serving",
       sparkEnv = engineInstance.sparkConf)
 
+    val algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
+      Doer(engine.algorithmClassMap(n), p)
+    }
+
+    val servingParamsWithName = engineParams.servingParams
+
+    val serving = Doer(engine.servingClassMap(servingParamsWithName._1),
+      servingParamsWithName._2)
+
     
 
     actorSystem.actorOf(
@@ -225,6 +234,8 @@ object EngineServer extends Logging {
         classOf[EngineServerActor[Q, P]],
         sc,
         engine,
+        algorithms,
+        serving,
         sparkContext))
   }
 }
@@ -372,6 +383,8 @@ class EngineServerMasterActor (
 class EngineServerActor[Q, P](
     val args: EngineServerConfig,
     val engine: Engine[_, _, _, Q, P, _],
+    var algorithms: Seq[BaseAlgorithm[_, _, Q, P]],
+    var serving: BaseServing[Q, P],
     val sparkContext: SparkContext) extends Actor with HttpService with KeyAuthentication {
   
 
@@ -445,13 +458,13 @@ class EngineServerActor[Q, P](
 
       		  val engineParams = engine.engineInstanceToEngineParams(engineInstance, args.jsonExtractor)
 
-      		  val algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
+      		  algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
       				Doer(engine.algorithmClassMap(n), p)
     		  }
 
     		  val servingParamsWithName = engineParams.servingParams
 
-    		  val serving = Doer(engine.servingClassMap(servingParamsWithName._1),
+    		  serving = Doer(engine.servingClassMap(servingParamsWithName._1),
       		  	servingParamsWithName._2)
 
       		  val modelsFromEngineInstance = kryo.invert(modeldata.get(engineInstance.id).get.models).get.asInstanceOf[Seq[Any]]

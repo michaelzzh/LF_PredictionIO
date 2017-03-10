@@ -42,6 +42,8 @@ object CreateWorkflow extends Logging {
 
   case class WorkflowConfig(
     preDeployment: Boolean = false,
+    baseEngineId: String = "",
+    baseEngineURI: String = "",
     deployMode: String = "",
     batch: String = "",
     engineId: String = "",
@@ -89,6 +91,12 @@ object CreateWorkflow extends Logging {
     opt[String]("engine-version") required() action { (x, c) =>
       c.copy(engineVersion = x)
     } text("Engine's version.")
+    opt[String]("base-engine-id") required() action { (x, c) =>
+      c.copy(baseEngineId = x)
+    }
+    opt[String]("base-engine-uri") required() action { (x, c) =>
+      c.copy(baseEngineURI = x)
+    }
     opt[String]("engine-variant") required() action { (x, c) =>
       c.copy(engineVariant = x)
     } text("Engine variant JSON.")
@@ -136,6 +144,10 @@ object CreateWorkflow extends Logging {
       c.copy(jsonExtractor = JsonExtractorOption.withName(x))
     }
   }
+  def updateVariantJson(variantString: String, engineId: String):String = {
+    val result = variantString.replaceAll("\"base\"", "\"default\"").replaceAll("\"INVALID_APP_NAME\"", "\""+ engineId + "\"")
+    result
+  }
 
   def main(args: Array[String]): Unit = {
     val wfcOpt = parser.parse(args, WorkflowConfig())
@@ -179,7 +191,11 @@ object CreateWorkflow extends Logging {
     ).getOrElse(Map())
 
     if (evaluation.isEmpty) {
-      val variantJson = parse(stringFromFile(wfc.engineVariant))
+      val variantJson = if(wfc.preDeployment) parse(stringFromFile(s"${wfc.baseEngineURI}/engine.json"))
+                        else parse(updateVariantJson(stringFromFile(s"${wfc.baseEngineURI}/engine.json"), wfc.engineId))
+      if(!wfc.preDeployment){
+        System.out.println(updateVariantJson(stringFromFile(s"${wfc.baseEngineURI}/engine.json"), wfc.engineId))
+      }  
       val engineFactory = if (wfc.engineFactory == "") {
         variantJson \ "engineFactory" match {
           case JString(s) => s

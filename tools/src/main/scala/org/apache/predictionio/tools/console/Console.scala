@@ -63,7 +63,6 @@ case class ConsoleArgs(
   app: AppArgs = AppArgs(),
   accessKey: AccessKeyArgs = AccessKeyArgs(),
   deploy: DeployArgs = DeployArgs(),
-  query: QueryArgs = QueryArgs(),
   eventServer: EventServerArgs = EventServerArgs(),
   adminServer: AdminServerArgs = AdminServerArgs(),
   dashboard: DashboardArgs = DashboardArgs(),
@@ -85,9 +84,9 @@ case class CommonArgs(
   driverPassThrough: Seq[String] = Seq(),
   pioHome: Option[String] = None,
   sparkHome: Option[String] = None,
-  engineId: Option[String] = None,
-  engineVersion: Option[String] = None,
-  engineFactory: Option[String] = None,
+  baseEngineURI: String = "",
+  engineId: String = "",
+  baseEngineId: String = "",
   engineParamsKey: Option[String] = None,
   evaluation: Option[String] = None,
   engineParamsGenerator: Option[String] = None,
@@ -115,12 +114,6 @@ case class DeployArgs(
   port: Int = 8000,
   logUrl: Option[String] = None,
   logPrefix: Option[String] = None)
-
-case class QueryArgs(
-  variantId: String = "default",
-  features: String = "",
-  engineIdList: String = ""
-)
 
 case class EventServerArgs(
   enabled: Boolean = false,
@@ -167,12 +160,14 @@ object Console extends Logging {
         "        environmental variable. If this fails as well, default to\n" +
         "        current directory.")
       opt[String]("engine-id") abbr("ei") action { (x, c) =>
-        c.copy(common = c.common.copy(engineId = Some(x)))
+        c.copy(common = c.common.copy(engineId = x))
       } text("Specify an engine ID. Usually used by distributed deployment.")
-      opt[String]("engine-version") abbr("ev") action { (x, c) =>
-        c.copy(common = c.common.copy(engineVersion = Some(x)))
-      } text("Specify an engine version. Usually used by distributed " +
-        "deployment.")
+      opt[String]("base-engine-uri") abbr("be") action { (x, c) =>
+        c.copy(common = c.common.copy(baseEngineURI = x))
+      } text("specify the location of base engine")
+      opt[String]("base-engine-id") action { (x, c) =>
+        c.copy(common = c.common.copy(baseEngineId = x))
+      }
       opt[File]("variant") abbr("v") action { (x, c) =>
         c.copy(common = c.common.copy(variantJson = x))
       }
@@ -282,9 +277,6 @@ object Console extends Logging {
           opt[Int]("verbosity") action { (x, c) =>
             c.copy(common = c.common.copy(verbosity = x))
           },
-          opt[String]("engine-factory") action { (x, c) =>
-            c.copy(common = c.common.copy(engineFactory = Some(x)))
-          },
           opt[String]("engine-params-key") action { (x, c) =>
             c.copy(common = c.common.copy(engineParamsKey = Some(x)))
           },
@@ -326,26 +318,7 @@ object Console extends Logging {
               failure(s"$x is not a valid json-extractor option [$validOptions]")
             }
           }
-        )
-      note("")
-      cmd("query").
-        text("Query an engine instance").
-        action { (_, c) =>
-          c.copy(commands = c.commands :+ "query")
-        } children(
-          opt[String]("features") action { (x, c) =>
-            c.copy(query = c.query.copy(features = x))
-          } text("features of the query"),
-          opt[String]("accesskey") action { (x, c) =>
-            c.copy(accessKey = c.accessKey.copy(accessKey = x))
-          } text("Access key of the App where feedback data will be stored."),
-          opt[String]("variant-id") action { (x, c) =>
-            c.copy(query = c.query.copy(variantId = x))
-          },
-          opt[String]("engine-id-list") action { (x, c) =>
-            c.copy(query = c.query.copy(engineIdList = x))
-          }          
-        )        
+        )      
       note("")
       cmd("deploy").
         text("Deploy an engine instance as a prediction server. This\n" +
@@ -749,22 +722,18 @@ object Console extends Logging {
           regenerateManifestJson(ca.common.manifestJson)
           build(ca)
         case Seq("register") =>
-          val eId = ca.common.engineId getOrElse ""
-          generateManifestJsonWithEngineId(ca.common.manifestJson, eId)
-          registerEngineWithArgs(ca)
+          val eId = ca.common.engineId
+          registerEngineWithArgs(ca, eId)
           0
         case Seq("unregister") =>
           unregister(ca)
           0
         case Seq("train") =>
-          regenerateManifestJson(ca.common.manifestJson)
+          //regenerateManifestJson(ca.common.manifestJson)
           train(ca)
         case Seq("eval") =>
           regenerateManifestJson(ca.common.manifestJson)
           train(ca)
-        case Seq("query") =>
-          //query(ca)
-          groupQuery(ca)
         case Seq("deploy") =>
           deploy(ca)
         case Seq("undeploy") =>
@@ -860,17 +829,25 @@ object Console extends Logging {
 
   def version(ca: ConsoleArgs): Unit = println(BuildInfo.version)
 
-  def registerEngineWithArgs(ca: ConsoleArgs): Int = {
-    val jarFiles = jarFilesForScala
+  def registerEngineWithArgs(ca: ConsoleArgs, engineId: String): Int = {
+    if (engineId == ""){
+      error("No engineId specified. Abort engine register")
+      return 1
+    }
+    val jarFiles = jarFilesForScalaWithBaseEngineURI(ca.common.baseEngineURI)
     if (jarFiles.isEmpty) {
       error("No engine found. Your build might have failed. Aborting.")
       return 1
     }
     jarFiles foreach { f => info(s"Found ${f.getName}")}
-    RegisterEngine.registerEngine(
-      ca.common.manifestJson,
-      jarFiles,
-      false)
+    val manifest = EngineManifest(
+      id = engineId,
+      version = engineId,
+      name = new File(ca.common.baseEngineURI).getName,
+      description = Some(manifestManualgenTag),
+      files = Seq(),
+      engineFactory = "")
+    RegisterEngine.registerEngineWithManifest(manifest, jarFiles)
     info("Your engine is ready for training.")
     0
   }
@@ -900,80 +877,17 @@ object Console extends Logging {
   def train(ca: ConsoleArgs): Int = {
     Template.verifyTemplateMinVersion(new File("template.json"))
     withRegisteredManifest(
-      ca.common.manifestJson,
       ca.common.engineId,
-      ca.common.engineVersion) { em =>
+      ca.common.engineId) { em =>
       RunWorkflow.newRunWorkflow(ca, em)
     }
-  }
-
-  def query(ca: ConsoleArgs): Int = {
-    Template.verifyTemplateMinVersion(new File("template.json"))
-    withCustomRegisteredManifest(
-      ca.common.engineId,
-      ca.common.engineVersion) { em =>
-      //val variantJson = parse(Source.fromFile(ca.common.variantJson).mkString)
-      // val variantId = variantJson \ "id" match {
-      //   case JString(s) => s
-      //   case _ =>
-      //     error("Unable to read engine variant ID from " +
-      //       s"${ca.common.variantJson.getCanonicalPath}. Aborting.")
-      //      return 1
-      // }
-      val variantId = ca.query.variantId
-      val engineInstances = storage.Storage.getMetaDataEngineInstances
-      val engineInstance = ca.engineInstanceId map { eid =>
-        engineInstances.get(eid)
-      } getOrElse {
-        engineInstances.getLatestCompleted(em.id, em.version, variantId)
-      }
-      engineInstance map { r =>
-        //RunServer.newRunServer(ca, em, r.id)
-        RunServer.newSingleQuery(ca,em,r.id)
-      } getOrElse {
-        ca.engineInstanceId map { eid =>
-          error(
-            s"Invalid engine instance ID ${ca.engineInstanceId}. Aborting.")
-        } getOrElse {
-          error(
-            s"No valid engine instance found for engine ${em.id} " +
-              s"${em.version}.\nTry running 'train' before 'deploy'. Aborting.")
-        }
-        1
-      }
-    }
-  }
-
-  def groupQuery(ca: ConsoleArgs): Int = {
-    Template.verifyTemplateMinVersion(new File("template.json"))
-    val manifests = getCustomRegisteredManifestList(ca.query.engineIdList)
-    var engineInstanceIdList = new ListBuffer[String]()
-    for(em <- manifests){
-      //needs to be changed, should be a list
-      val variantId = ca.query.variantId
-      val engineInstances = storage.Storage.getMetaDataEngineInstances
-      val engineInstance = engineInstances.getLatestCompleted(em.id, em.version, variantId)
-      engineInstance map {r => engineInstanceIdList += r.id} getOrElse {
-        ca.engineInstanceId map { eid =>
-          error(
-            s"Invalid engine instance ID ${ca.engineInstanceId}. Aborting.")
-        } getOrElse {
-          error(
-            s"No valid engine instance found for engine ${em.id} " +
-              s"${em.version}.\nTry running 'train' before 'deploy'. Aborting.")
-        }
-      }
-    }
-    RunServer.newGroupQuery(ca, manifests, engineInstanceIdList.toList.mkString("&")) 
-    1
   }
 
   def deploy(ca: ConsoleArgs): Int = {
     Template.verifyTemplateMinVersion(new File("template.json"))
     withRegisteredManifest(
-      ca.common.manifestJson,
       ca.common.engineId,
-      ca.common.engineVersion) { em =>
+      ca.common.engineId) { em =>
       val variantJson = parse(Source.fromFile(ca.common.variantJson).mkString)
       val variantId = variantJson \ "id" match {
         case JString(s) => s
@@ -1350,19 +1264,15 @@ object Console extends Logging {
   }
 
   def withRegisteredManifest(
-      json: File,
-      engineId: Option[String],
-      engineVersion: Option[String])(
+      engineId: String,
+      engineVersion: String)(
       op: EngineManifest => Int): Int = {
-    val ej = readManifestJson(json)
-    val id = engineId getOrElse ej.id
-    val version = engineVersion getOrElse ej.version
-    storage.Storage.getMetaDataEngineManifests.get(id, version) map {
+    storage.Storage.getMetaDataEngineManifests.get(engineId, engineVersion) map {
       op
     } getOrElse {
-      error(s"Engine ${id} ${version} cannot be found in the system.")
+      error(s"Engine ${engineId} ${engineVersion} cannot be found in the system.")
       error("Possible reasons:")
-      error("- the engine is not yet built by the 'build' command;")
+      error("- incorrect engineId")
       error("- the meta data store is offline.")
       1
     }
@@ -1403,6 +1313,12 @@ object Console extends Logging {
 
   def jarFilesAt(path: File): Array[File] = recursiveListFiles(path) filter {
     _.getName.toLowerCase.endsWith(".jar")
+  }
+
+  def jarFilesForScalaWithBaseEngineURI(baseEngineURI: String): Array[File] = {
+    val libFiles = jarFilesForScalaFilter(jarFilesAt(new File(s"${baseEngineURI}/lib")))
+    val targetFiles = jarFilesForScalaFilter(jarFilesAt(new File(s"${baseEngineURI}/target/scala-${scalaVersionNoPatch}")))
+    if(targetFiles.size > 0) targetFiles else libFiles
   }
 
   def jarFilesForScala: Array[File] = {

@@ -153,83 +153,59 @@ class  EventServiceActor(
     val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
     for(engine <- baseEngines){
       Future{
-        Process(Seq("pio", "deploy", s"--manifest ${pio_root}/engines/engine-manifests/${engine}.json",
-          s"--variant ${pio_root}/engines/engine-params/${engine}.json")).!
+        Process(Seq("pio", "deploy", s"--engine-id ${engine}",
+          s"--variant ${pio_root}/engines/${engine}/engine.json")).!
       }
       System.out.println(s"Starting up base engine ${engine}")
     } 
   }
 
-  def registerEngine(userName: String, accessKey: String):String = {
-    Process(Seq("pio", "register", s"--engine-id ${userName}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json"),
-      new File(s"${pio_root}/engines/base-engine")).!
-    registerEngineParam(userName)
+  def registerEngine(engineId: String, accessKey: String, baseEngine: String):String = {
+    Process(Seq("pio", "register", s"--engine-id ${engineId}", s"--base-engine-uri ${pio_root}/engines/${baseEngine}"),
+      new File(s"${pio_root}/engines/baseClassification")).!
+    //registerEngineParam(engineId)
 
     Future{
-      Process(Seq("pio", "app", "new", userName, "--access-key", accessKey)).!
+      Process(Seq("pio", "app", "new", engineId, "--access-key", accessKey)).!
     }
 
-    s"user ${userName} registered"
+    s"user ${engineId} registered"
   }
 
-  def deleteUser(userName: String):String = {
-    Process(Seq("pio", "app", "delete", userName, "-f")).!
-    s"user ${userName} removed"
+  def deleteEngine(engineId: String):String = {
+    Process(Seq("pio", "app", "delete", engineId, "-f")).!
+    s"engine ${engineId} removed"
   }
 
-  def deployEngine(port: Int, userName: String) = {
-    val deploy: Future[Int] = Future {
-      val stream = Process(Seq("pio", "deploy", s"--port ${port}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json",
-       s"--variant ${pio_root}/engines/engine-params/${userName}.json"), new File(s"${pio_root}/engines/base-engine")).lines
-      for(x <- stream) {
-        System.out.println(x)
-        if(x.contains("deployed")){
-          System.out.println("received completed signal")
-          1
-        }
-      }
-      -1
-    }
-    
-
-    deploy onComplete{
-      case _ => System.out.println("Engine deploy completed")
-    }
-  }
-
-  def runQuery(userName: String, features: String, engineIds: String) = {
-    //System.out.println(s"features: $features")
-    val query: Future[Unit] = Future {
-      val stream = Process(Seq("pio", "query", s"--features ${features}", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json",
-       s"--variant ${pio_root}/engines/engine-params/${userName}.json", s"--engine-id-list ${engineIds}", s"--engine-version ${userName}"), new File(s"${pio_root}/engines/base-engine")).lines
-      for(x <- stream) {
-        System.out.println(x)
-      }
-    }
-  }
-
-  def trainEngine(userName: String) = {
+  def trainEngine(engineId: String, baseEngine: String) = {
     val training: Future[String] = Future {
-      val stream = Process(Seq("pio", "train", s"--manifest ${pio_root}/engines/engine-manifests/${userName}.json", 
-        s"--variant ${pio_root}/engines/engine-params/${userName}.json"), new File(s"${pio_root}/engines/base-engine")).lines
+      val stream = Process(Seq(
+        "pio", 
+        "train", 
+        s"--engine-id ${engineId}", 
+        s"--base-engine-uri ${pio_root}/engines/${baseEngine}", 
+        s"--base-engine-id ${baseEngine}",
+        s"--variant ${pio_root}/engines/engine-params/${engineId}.json"), 
+      new File(s"${pio_root}/engines/baseClassification")).lines
+      
       stream foreach println
-      userName
+      engineId
     }
 
     training onComplete {
-      case Success(userName) => {
+      case Success(engineId) => {
   
       }
       case Failure(t) => println("An error has occured at train: " + t.getMessage)
     }
   }
 
-  def registerEngineParam(userName: String) = {
+  def registerEngineParam(engineId: String) = {
     val engineFile = new File(s"${pio_root}/engines/engine-params/baseClassification.json")
-    val tempFile = new File(s"${pio_root}/engines/engine-params/${userName}.json")
+    val tempFile = new File(s"${pio_root}/engines/engine-params/${engineId}.json")
     val writer = new PrintWriter(tempFile)
     Source.fromFile(engineFile).getLines
-      .map { x => if(x.contains("\"appName\"")) "      \"appName\": \""+userName+"\","
+      .map { x => if(x.contains("\"appName\"")) "      \"appName\": \""+engineId+"\","
                   else if(x.contains("\"id\"")) "  \"id\": \"default\""
                   else x}
       .foreach(x => writer.println(x))
@@ -480,16 +456,17 @@ class  EventServiceActor(
         }
       }
     } ~
-    path("user") {
+    path("engine" / "register") {
       import Json4sProtocol._
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
             entity(as[EngineData]) {data =>
               complete {
-                val userName = data.userName
+                val engineId = data.engineId
                 val accessKey = data.accessKey
-                registerEngine(userName, accessKey)
+                val baseEngine = data.baseEngine
+                registerEngine(engineId, accessKey, baseEngine)
               }
             }
           }
@@ -500,8 +477,8 @@ class  EventServiceActor(
           handleRejections(rejectionHandler) {
             entity(as[EngineData]) {data =>
               complete {
-                val userName = data.userName
-                deleteUser(userName)
+                val engineId = data.engineId
+                deleteEngine(engineId)
               }
             }
           }
@@ -515,52 +492,10 @@ class  EventServiceActor(
           handleRejections(rejectionHandler) {
             entity(as[EngineData]) {data =>
               complete {
-                val userName = data.userName
-                trainEngine(userName)
-                s"training started for ${userName}"
-              }
-            }
-          }
-        }
-      }
-    }~
-    path("engine" / "deploy"){
-      import Json4sProtocol._
-      post{
-        handleExceptions(Common.exceptionHandler) {
-          handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              complete {
-                val userName = data.userName
-                val port = data.port
-                deployEngine(port, userName)
-                s"deploying engine for ${userName} on port ${port}"
-              }
-            }
-          }
-        }
-      }
-    }~
-    path("engine" / "predict"){
-      import Json4sProtocol._
-      post{
-        handleExceptions(Common.exceptionHandler) {
-          handleRejections(rejectionHandler) { 
-            entity(as[QueryData]) {data =>
-              complete {
-                //val inputs = data.split(":")
-                // val userName = data.userName
-                // var engineIds = data.engineIds.mkString("-")
-                // if(data.engineIds.length == 1){
-                //   engineIds = engineIds + "-"
-                // }
-                // //val query = inputs(1).substring(0,inputs(1).length()-1).replace('|', ':')
-                // var query: String = data.properties.mkString("!")
-                // if(data.properties.length == 1){
-                //   query = query + "!"
-                // }
-                // runQuery(userName, query, engineIds)
-                s"query is being performed"
+                val engineId = data.engineId
+                val baseEngine = data.baseEngine
+                trainEngine(engineId, baseEngine)
+                s"training started for ${engineId}"
               }
             }
           }

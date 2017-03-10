@@ -60,6 +60,7 @@ import sys.process._
 import java.io.File
 import java.io.PrintWriter
 import scala.io.Source
+import scala.util.Properties
 
 import java.io._
 import org.apache.commons._
@@ -85,7 +86,9 @@ class  EventServiceActor(
       // some format not converted, or timezone not correct
       new DateTimeJson4sSupport.Serializer
   }
-  val pio_root = "/home/dev/PredictionIO/apache-predictionio-0.10.0-incubating"
+
+  val pio_root = sys.env("PIO_ROOT")
+  //val pio_root = "/$HOME/PredictionIO/LFPredictionIO/apache-predictionio-0.10.0-incubating"
 
   val MaxNumberOfEventsPerBatchRequest = 50
 

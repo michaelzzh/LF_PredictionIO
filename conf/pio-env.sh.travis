@@ -22,6 +22,7 @@
 #
 # This section controls core behavior of PredictionIO. It is very likely that
 # you need to change these to fit your site.
+PIO_ROOT=$HOME/PredictionIO/LFPredictionIO/apache-predictionio-0.10.0-incubating
 
 # SPARK_HOME: Apache Spark is a hard dependency and must be configured.
 SPARK_HOME=$PIO_HOME/vendors/spark-1.3.0-bin-hadoop2.4

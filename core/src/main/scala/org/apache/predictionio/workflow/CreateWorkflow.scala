@@ -193,9 +193,7 @@ object CreateWorkflow extends Logging {
     if (evaluation.isEmpty) {
       val variantJson = if(wfc.preDeployment) parse(stringFromFile(s"${wfc.baseEngineURI}/engine.json"))
                         else parse(updateVariantJson(stringFromFile(s"${wfc.baseEngineURI}/engine.json"), wfc.engineId))
-      if(!wfc.preDeployment){
-        System.out.println(updateVariantJson(stringFromFile(s"${wfc.baseEngineURI}/engine.json"), wfc.engineId))
-      }  
+
       val engineFactory = if (wfc.engineFactory == "") {
         variantJson \ "engineFactory" match {
           case JString(s) => s
@@ -243,7 +241,11 @@ object CreateWorkflow extends Logging {
         engineFactoryObj.engineParams(wfc.engineParamsKey)
       }
 
-      val engineInstance = EngineInstance(
+      val engineInstances = Storage.getMetaDataEngineInstances
+      val trainingAlreadyDone = engineInstances.getLatestCompleted(wfc.engineId, wfc.engineVersion, variantId) != None
+
+      if(!wfc.preDeployment || !trainingAlreadyDone){
+        val engineInstance = EngineInstance(
         id = "",
         status = "INIT",
         startTime = DateTime.now,
@@ -264,16 +266,19 @@ object CreateWorkflow extends Logging {
         servingParams =
           JsonExtractor.paramToJson(wfc.jsonExtractor, engineParams.servingParams))
 
-      val engineInstanceId = Storage.getMetaDataEngineInstances.insert(
-        engineInstance)
+        val engineInstanceId = Storage.getMetaDataEngineInstances.insert(
+          engineInstance)
 
-      CoreWorkflow.runTrain(
-        wfc.preDeployment,
-        env = pioEnvVars,
-        params = workflowParams,
-        engine = trainableEngine,
-        engineParams = engineParams,
-        engineInstance = engineInstance.copy(id = engineInstanceId))
+        CoreWorkflow.runTrain(
+          wfc.preDeployment,
+          env = pioEnvVars,
+          params = workflowParams,
+          engine = trainableEngine,
+          engineParams = engineParams,
+          engineInstance = engineInstance.copy(id = engineInstanceId))
+      }else{
+        logger.info("base engine already deployable")
+      }
     } else {
       val workflowParams = WorkflowParams(
         verbose = wfc.verbosity,

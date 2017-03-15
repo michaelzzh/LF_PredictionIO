@@ -166,7 +166,6 @@ class  EventServiceActor(
   def registerEngine(engineId: String, accessKey: String, baseEngine: String):String = {
     Process(Seq("pio", "register", s"--engine-id ${engineId}", s"--base-engine-uri ${pio_root}/engines/${baseEngine}"),
       new File(s"${pio_root}/engines/${baseEngine}")).!
-    //registerEngineParam(engineId)
 
     Future{
       Process(Seq("pio", "app", "new", engineId, "--access-key", accessKey)).!
@@ -201,18 +200,6 @@ class  EventServiceActor(
       }
       case Failure(t) => println("An error has occured at train: " + t.getMessage)
     }
-  }
-
-  def registerEngineParam(engineId: String) = {
-    val engineFile = new File(s"${pio_root}/engines/engine-params/baseClassification.json")
-    val tempFile = new File(s"${pio_root}/engines/engine-params/${engineId}.json")
-    val writer = new PrintWriter(tempFile)
-    Source.fromFile(engineFile).getLines
-      .map { x => if(x.contains("\"appName\"")) "      \"appName\": \""+engineId+"\","
-                  else if(x.contains("\"id\"")) "  \"id\": \"default\""
-                  else x}
-      .foreach(x => writer.println(x))
-    writer.close()
   }
 
   private val FailedAuth = Left(

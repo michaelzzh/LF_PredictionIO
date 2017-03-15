@@ -57,6 +57,7 @@ import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
 import scalaj.http.HttpOptions
+import scala.collection.mutable.ListBuffer
 
 import scopt.Read
 import scopt._
@@ -390,7 +391,7 @@ class EngineServerActor[Q, P](
     var serving: BaseServing[Q, P],
     val sparkContext: SparkContext) extends Actor with HttpService with KeyAuthentication {
   
-
+  val replyAddress = "http://pacora:8888"
   val kryo = ESKryoInstantiator.newKryoInjection
   val serverStartTime = DateTime.now
   val log = Logging(context.system, this)
@@ -442,13 +443,12 @@ class EngineServerActor[Q, P](
       import ServerJson4sSupport._
       post {
         handleExceptions(Common.exceptionHandler) {
-        handleRejections(Common.rejectionHandler) {
+         handleRejections(Common.rejectionHandler) {
           entity(as[QueryData]) { qd =>
-          	val servingStartTime = DateTime.now
             val jsonExtractorOption = args.jsonExtractor
-            val queryTime = DateTime.now
+            val requestStartTime = DateTime.now
           	val engineId = qd.engineId
-            val queryString = qd.properties.head
+            val queryStrings = qd.properties
             try {
               var engineInstanceId = ""
 
@@ -478,37 +478,39 @@ class EngineServerActor[Q, P](
       		  	modelsFromEngineInstance,
       		  	params = WorkflowParams()
       		  )
-              //System.out.println(s"queryString: ${queryString}")
-              
-              // Extract Query from Json
-              val query = JsonExtractor.extract(
-                jsonExtractorOption,
-                queryString,
-                algorithms.head.queryClass,
-                algorithms.head.querySerializer,
-                algorithms.head.gsonTypeAdapterFactories
-              )
-              val queryJValue = JsonExtractor.toJValue(
-                jsonExtractorOption,
-                query,
-                algorithms.head.querySerializer,
-                algorithms.head.gsonTypeAdapterFactories)
-              // Deploy logic. First call Serving.supplement, then Algo.predict,
-              // finally Serving.serve.
-              val supplementedQuery = serving.supplementBase(query)
-              // TODO: Parallelize the following.
-              val predictions = algorithms.zipWithIndex.map { case (a, ai) =>
-                a.predictBase(models(ai), supplementedQuery)
-              }
-              // Notice that it is by design to call Serving.serve with the
-              // *original* query.
-              val prediction = serving.serveBase(query, predictions)
-              val predictionJValue = JsonExtractor.toJValue(
-                jsonExtractorOption,
-                prediction,
-                algorithms.head.querySerializer,
-                algorithms.head.gsonTypeAdapterFactories)
-              /** Handle feedback to Event Server
+
+      		  var responseList = ListBuffer[String]()
+              for(queryString <- queryStrings){
+              	val singleServingStartTime = DateTime.now
+              	// Extract Query from Json
+              	val query = JsonExtractor.extract(
+                	jsonExtractorOption,
+                	queryString,
+                	algorithms.head.queryClass,
+                	algorithms.head.querySerializer,
+                	algorithms.head.gsonTypeAdapterFactories
+              	)
+              	val queryJValue = JsonExtractor.toJValue(
+              		jsonExtractorOption,
+                	query,
+                	algorithms.head.querySerializer,
+                	algorithms.head.gsonTypeAdapterFactories)
+              	// Deploy logic. First call Serving.supplement, then Algo.predict,
+              	// finally Serving.serve.
+              	val supplementedQuery = serving.supplementBase(query)
+              	// TODO: Parallelize the following.
+              	val predictions = algorithms.zipWithIndex.map { case (a, ai) =>
+              		a.predictBase(models(ai), supplementedQuery)
+              	}
+              	// Notice that it is by design to call Serving.serve with the
+              	// *original* query.
+              	val prediction = serving.serveBase(query, predictions)
+              	val predictionJValue = JsonExtractor.toJValue(
+                	jsonExtractorOption,
+                	prediction,
+                	algorithms.head.querySerializer,
+                	algorithms.head.gsonTypeAdapterFactories)
+              	/** Handle feedback to Event Server
                 * Send the following back to the Event Server
                 * - appId
                 * - engineInstanceId
@@ -516,103 +518,71 @@ class EngineServerActor[Q, P](
                 * - prediction
                 * - prId
                 */
-              val result = if (feedbackEnabled) {
-                implicit val formats =
-                  algorithms.headOption map { alg =>
-                    alg.querySerializer
-                  } getOrElse {
-                    Utils.json4sDefaultFormats
-                  }
-                // val genPrId = Random.alphanumeric.take(64).mkString
-                def genPrId: String = Random.alphanumeric.take(64).mkString
-                val newPrId = prediction match {
-                  case id: WithPrId =>
-                    val org = id.prId
-                    if (org.isEmpty) genPrId else org
-                  case _ => genPrId
-                }
+              	val result = predictionJValue
 
-                // also save Query's prId as prId of this pio_pr predict events
-                val queryPrId =
-                  query match {
-                    case id: WithPrId =>
-                      Map("prId" -> id.prId)
-                    case _ =>
-                      Map()
-                  }
-                // val data = Map(
-                //   // "appId" -> dataSourceParams.asInstanceOf[ParamsWithAppId].appId,
-                //   "event" -> "predict",
-                //   "eventTime" -> queryTime.toString(),
-                //   "entityType" -> "pio_pr", // prediction result
-                //   "entityId" -> newPrId,
-                //   "properties" -> Map(
-                //     "engineInstanceId" -> engineInstance.id,
-                //     "query" -> query,
-                //     "prediction" -> prediction)) ++ queryPrId
-                // // At this point args.accessKey should be Some(String).
-                // val accessKey = args.accessKey.getOrElse("")
-                // val f: Future[Int] = future {
-                //   scalaj.http.Http(
-                //     s"http://${args.eventServerIp}:${args.eventServerPort}/" +
-                //     s"events.json?accessKey=$accessKey").postData(
-                //     write(data)).header(
-                //     "content-type", "application/json").asString.code
-                // }
-                // f onComplete {
-                //   case Success(code) => {
-                //     if (code != 201) {
-                //       log.error(s"Feedback event failed. Status code: $code."
-                //         + s"Data: ${write(data)}.")
-                //     }
-                //   }
-                //   case Failure(t) => {
-                //     log.error(s"Feedback event failed: ${t.getMessage}") }
-                // }
-                // overwrite prId in predictedResult
-                // - if it is WithPrId,
-                //   then overwrite with new prId
-                // - if it is not WithPrId, no prId injection
-                if (prediction.isInstanceOf[WithPrId]) {
-                  predictionJValue merge parse(s"""{"prId" : "$newPrId"}""")
-                } else {
-                  predictionJValue
-                }
-              } else predictionJValue
 
-              System.out.println(s"PredictionJValue: ${predictionJValue}")
+              	val pluginResult =
+                	pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>
+                  		p.process(engineInstance, queryJValue, r, pluginContext)
+                	}
 
-              val pluginResult =
-                pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>
-                  p.process(engineInstance, queryJValue, r, pluginContext)
-                }
+                responseList +=compact(render(pluginResult))
+                //System.out.println(s"pluginResult: ${compact(render(pluginResult))}")
 
-              // Bookkeeping
-              val servingEndTime = DateTime.now
-              lastServingSec =
-                (servingEndTime.getMillis - servingStartTime.getMillis) / 1000.0
-              avgServingSec =
-                ((avgServingSec * requestCount) + lastServingSec) /
-                (requestCount + 1)
-              requestCount += 1
-              System.out.println(s"query time: ${lastServingSec}, average query time: ${avgServingSec}")
-              respondWithMediaType(`application/json`) {
-                complete(compact(render(pluginResult)))
+              	// Bookkeeping
+              	val servingEndTime = DateTime.now
+              	lastServingSec =
+                	(servingEndTime.getMillis - singleServingStartTime.getMillis) * 1.0
+              	avgServingSec =
+                	((avgServingSec * requestCount) + lastServingSec) /
+                	(requestCount + 1)
+              	requestCount += 1
+              		//System.out.println(s"query time: ${lastServingSec}, average query time: ${avgServingSec}")
               }
+
+              val data = Map(
+                  // "appId" -> dataSourceParams.asInstanceOf[ParamsWithAppId].appId,
+                  "response" -> responseList.toList
+        		)
+                // At this point args.accessKey should be Some(String).
+                val f: Future[Int] = future {
+                  scalaj.http.Http(
+                    s"${replyAddress}").postData(
+                    write(data)).header(
+                    "content-type", "application/json").asString.code
+                }
+                f onComplete {
+                  case Success(code) => {
+                    if (code != 201) {
+                      log.error(s"send back response failed. Status code: $code."
+                        + s"Data: ${write(data)}.")
+                    }
+                  }
+                  case Failure(t) => {
+                    log.error(s"send back response failed: ${t.getMessage}") }
+                }
+              val requestEndTime = DateTime.now
+              val totalRequestTime =
+                	(requestEndTime.getMillis - requestStartTime.getMillis) / 1000.0
+              System.out.println(s"total serving time: ${totalRequestTime} seconds, average query time: ${avgServingSec} milliseconds, items in this batch: ${queryStrings.size}")
+              complete("query being performed")
+              // respondWithMediaType(`application/json`) {
+              //   complete(compact(render(pluginResult)))
+              // }
             } catch {
               case e: MappingException =>
                 log.error(
-                  s"Query '$queryString' is invalid. Reason: ${e.getMessage}")
+                  s"Query 'queryString' is invalid. Reason: ${e.getMessage}")
                 args.logUrl map { url =>
                   remoteLog(
                     url,
                     args.logPrefix.getOrElse(""),
-                    s"Query:\n$queryString\n\nStack Trace:\n" +
+                    s"Query:\nqueryString\n\nStack Trace:\n" +
                       s"${getStackTraceString(e)}\n\n")
                   }
                 complete(StatusCodes.BadRequest, e.getMessage)
               case e: Throwable =>
-                val msg = s"Query:\n$queryString\n\nStack Trace:\n" +
+                val msg = s"Query:\nqueryString\n\nStack Trace:\n" +
                   s"${getStackTraceString(e)}\n\n"
                 log.error(msg)
                 args.logUrl map { url =>
@@ -624,7 +594,7 @@ class EngineServerActor[Q, P](
                 complete(StatusCodes.InternalServerError, msg)
             }
           }
-        }
+         }
         }
       }
     } ~

@@ -604,12 +604,12 @@ class ServerActor[Q, P](
                 }
               } else predictionJValue
 
-              System.out.println(s"PredictionJValue: ${predictionJValue}")
-
               val pluginResult =
                 pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>
                   p.process(engineInstance, queryJValue, r, pluginContext)
                 }
+
+              System.out.println(s"PredictionJValue: ${predictionJValue}")
 
               // Bookkeeping
               val servingEndTime = DateTime.now

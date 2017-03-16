@@ -29,6 +29,7 @@ import org.apache.predictionio.core.BaseServing
 import org.apache.predictionio.core.Doer
 import org.apache.predictionio.data.storage.EngineInstance
 import org.apache.predictionio.data.storage.EngineManifest
+import org.apache.predictionio.data.storage.ClientManifest
 import org.apache.predictionio.data.storage.Storage
 import org.apache.predictionio.data.storage.QueryData
 import org.apache.predictionio.data.api.Common
@@ -389,7 +390,6 @@ class EngineServerActor[Q, P](
     var serving: BaseServing[Q, P],
     val sparkContext: SparkContext) extends Actor with HttpService with KeyAuthentication {
   
-  val replyAddress = "http://pacora:8888"
   val kryo = ESKryoInstantiator.newKryoInjection
   val serverStartTime = DateTime.now
   val log = Logging(context.system, this)
@@ -447,37 +447,40 @@ class EngineServerActor[Q, P](
             val requestStartTime = DateTime.now
           	val engineId = qd.engineId
             val queryStrings = qd.properties
+            val clientId = qd.clientId
             try {
               var engineInstanceId = ""
 
+              val client = Storage.getMetaDataClientManifests.get(clientId) getOrElse {error(s"No existing client for client id $clientId")}
+              val replyAddress = client.url
               val modeldata = Storage.getModelDataModels
               val engineInstances = Storage.getMetaDataEngineInstances
-      		  val engineInstance = engineInstances.getLatestCompleted(engineId, engineId, "default") getOrElse {error(
+      		    val engineInstance = engineInstances.getLatestCompleted(engineId, engineId, "default") getOrElse {error(
             			s"No valid engine instance found for engine ${engineId} "
             		)}
-      		  engineInstanceId = engineInstance.id
+      		    engineInstanceId = engineInstance.id
 
-      		  val engineParams = engine.engineInstanceToEngineParams(engineInstance, args.jsonExtractor)
+      		    val engineParams = engine.engineInstanceToEngineParams(engineInstance, args.jsonExtractor)
 
-      		  algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
-      				Doer(engine.algorithmClassMap(n), p)
-    		  }
+      		    algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
+      				  Doer(engine.algorithmClassMap(n), p)
+    		      }
 
-    		  val servingParamsWithName = engineParams.servingParams
+    		      val servingParamsWithName = engineParams.servingParams
 
-    		  serving = Doer(engine.servingClassMap(servingParamsWithName._1),
+    		      serving = Doer(engine.servingClassMap(servingParamsWithName._1),
       		  	servingParamsWithName._2)
 
-      		  val modelsFromEngineInstance = kryo.invert(modeldata.get(engineInstance.id).get.models).get.asInstanceOf[Seq[Any]]
-      		  val models = engine.prepareDeploy(
-      		  	sparkContext,
-      		  	engineParams,
-      		  	engineInstanceId,
-      		  	modelsFromEngineInstance,
-      		  	params = WorkflowParams()
-      		  )
+      		    val modelsFromEngineInstance = kryo.invert(modeldata.get(engineInstance.id).get.models).get.asInstanceOf[Seq[Any]]
+      		    val models = engine.prepareDeploy(
+      		  	  sparkContext,
+      		  	  engineParams,
+      		  	  engineInstanceId,
+      		  	  modelsFromEngineInstance,
+      		  	  params = WorkflowParams()
+      		    )
 
-      		  var responseList = ListBuffer[String]()
+      		    var responseList = ListBuffer[String]()
               for(queryString <- queryStrings){
               	val singleServingStartTime = DateTime.now
               	// Extract Query from Json
@@ -541,23 +544,23 @@ class EngineServerActor[Q, P](
               val data = Map(
                   // "appId" -> dataSourceParams.asInstanceOf[ParamsWithAppId].appId,
                   "response" -> responseList.toList
-        		)
+        		  )
                 // At this point args.accessKey should be Some(String).
-                val f: Future[Int] = future {
-                  scalaj.http.Http(
-                    s"${replyAddress}").postData(
-                    write(data)).header(
-                    "content-type", "application/json").asString.code
-                }
-                f onComplete {
-                  case Success(code) => {
-                    if (code != 201) {
-                      log.error(s"send back response failed. Status code: $code."
-                        + s"Data: ${write(data)}.")
-                    }
+              val f: Future[Int] = future {
+                scalaj.http.Http(
+                  s"${replyAddress}").postData(
+                  write(data)).header(
+                  "content-type", "application/json").asString.code
+              }
+              f onComplete {
+                case Success(code) => {
+                  if (code != 201) {
+                    log.error(s"send back response failed. Status code: $code."
+                      + s"Data: ${write(data)}.")
                   }
-                  case Failure(t) => {
-                    log.error(s"send back response failed: ${t.getMessage}") }
+                }
+                case Failure(t) => {
+                  log.error(s"send back response failed: ${t.getMessage}") }
                 }
               val requestEndTime = DateTime.now
               val totalRequestTime =

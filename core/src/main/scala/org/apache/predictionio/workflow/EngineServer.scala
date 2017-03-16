@@ -610,7 +610,6 @@ class EngineServerActor[Q, P](
       authenticate(withAccessKeyFromFile) { request =>
         post {
           complete {
-            System.out.println("Stop received")
             context.system.scheduler.scheduleOnce(1.seconds) {
               context.actorSelection("/user/master") ! StopEngineServer()
             }

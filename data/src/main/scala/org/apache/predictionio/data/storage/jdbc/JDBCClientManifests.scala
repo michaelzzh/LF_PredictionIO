@@ -15,39 +15,45 @@ class JDBCClientManifests(client: String, config: StorageClientConfig, prefix: S
     sql"""
     create table if not exists $tableName (
       id varchar(100) not null primary key,
+      clientid text not null,
       url text not null)""".execute().apply()
   }
 
   def insert(i: ClientManifest): Unit = DB localTx { implicit session =>
+  	val id = java.util.UUID.randomUUID().toString
     sql"""
     INSERT INTO $tableName VALUES(
-      ${i.id},
+      ${id},
+      ${i.clientId},
       ${i.url})""".update().apply()
   }
 
-  def get(id: String): Option[ClientManifest] = DB localTx { implicit session =>
+  def get(clientId: String): Option[ClientManifest] = DB localTx { implicit session =>
     sql"""
     SELECT
       id,
+      clientid,
       url
-    FROM $tableName WHERE id = $id""".map(resultToClientManifest).single().apply()
+    FROM $tableName WHERE clientid = $clientId""".map(resultToClientManifest).single().apply()
   }
 
   def update(i: ClientManifest): Unit = DB localTx { implicit session =>
     sql"""
     update $tableName set
+      clientid = {i.clientId}
       url = ${i.url}
     where id = ${i.id}""".update().apply()
   }
 
-  def delete(id: String): Unit = DB localTx { implicit session =>
-    sql"DELETE FROM $tableName WHERE id = $id".update().apply()
+  def delete(clientId: String): Unit = DB localTx { implicit session =>
+    sql"DELETE FROM $tableName WHERE clientid = $clientId".update().apply()
   }
 
   /** Convert JDBC results to [[ClientManfiest]] */
   def resultToClientManifest(rs: WrappedResultSet): ClientManifest = {
     ClientManifest(
       id = rs.string("id"),
+      clientId = rs.string("clientid"),
       url = rs.string("url"))
   }
 }

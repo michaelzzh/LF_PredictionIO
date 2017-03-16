@@ -851,9 +851,9 @@ object Console extends Logging {
 
   def version(ca: ConsoleArgs): Unit = println(BuildInfo.version)
 
-  def addClient(id: String, url: String): Int = {
+  def addClient(clientId: String, url: String): Int = {
     val clientInstances = storage.Storage.getMetaDataClientManifests
-    val client = ClientManifest(id = id, url = url)
+    val client = ClientManifest(id = "", clientId = clientId, url = url)
     clientInstances.insert(client)
     1
   }

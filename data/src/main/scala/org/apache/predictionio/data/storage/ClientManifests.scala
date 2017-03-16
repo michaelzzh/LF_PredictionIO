@@ -13,6 +13,7 @@ import org.json4s._
 @DeveloperApi
 case class ClientManifest(
   id: String,
+  clientId: String,
   url: String)
 
 /** :: DeveloperApi ::
@@ -26,13 +27,13 @@ trait ClientManifests {
   def insert(clientManifest: ClientManifest): Unit
 
   /** Get an [[ClientManifest]] by its ID */
-  def get(id: String): Option[ClientManifest]
+  def get(clientId: String): Option[ClientManifest]
 
   /** Updates an [[ClientManifest]] */
   def update(clientInfo: ClientManifest): Unit
 
   /** Delete an [[ClientManifest]] by its ID */
-  def delete(id: String): Unit
+  def delete(clientId: String): Unit
 }
 
 /** :: DeveloperApi ::
@@ -47,6 +48,7 @@ class ClientManifestSerializer
     case JObject(fields) =>
       val seed = ClientManifest(
         id = "",
+        clientId = "",
         url = "")
       fields.foldLeft(seed) { case (clientManifest, field) =>
         field match {
@@ -61,6 +63,7 @@ class ClientManifestSerializer
     case clientManifest: ClientManifest =>
       JObject(
         JField("id", JString(clientManifest.id)) ::
+        JField("clientId", JString(clientManifest.clientId)) ::
         JField("url", JString(clientManifest.url)) ::
         Nil)
   }

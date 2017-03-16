@@ -47,7 +47,6 @@ libraryDependencies ++= Seq(
   "org.elasticsearch"       % "elasticsearch"  % elasticsearchVersion.value,
   "org.json4s"             %% "json4s-native"  % json4sVersion.value,
   "org.json4s"             %% "json4s-ext"     % json4sVersion.value,
-  "org.postgresql"          % "postgresql"     % "9.4-1204-jdbc41",
   "org.postgresql"          % "postgresql"     % "42.0.0",
   "org.scalatest"          %% "scalatest"      % "2.1.7" % "test",
   "org.scalikejdbc"        %% "scalikejdbc"    % "2.3.5",

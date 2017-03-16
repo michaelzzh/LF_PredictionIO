@@ -265,10 +265,7 @@ class EngineServerMasterActor (
         .param(ServerKey.param, ServerKey.get)
         .method("POST").asString.code
       code match {
-        case 200 => {
-        	log.info("code is 200")
-        	Unit
-        }
+        case 200 => ()
         case 404 => log.error(
           s"Another process is using $serverUrl. Unable to undeploy.")
         case _ => log.error(
@@ -307,6 +304,7 @@ class EngineServerMasterActor (
         log.error("Cannot bind a non-existing server backend.")
       }
     case x: StopEngineServer =>
+      System.out.println("In stopEngineServer")
       log.info(s"Stop server command received.")
       sprayHttpListener.map { l =>
         log.info("Server is shutting down.")
@@ -602,7 +600,7 @@ class EngineServerActor[Q, P](
       authenticate(withAccessKeyFromFile) { request =>
         post {
           complete {
-            context.actorSelection("/user/master") ! ReloadServer()
+            context.actorSelection("/user/master") ! ReloadEngineServer()
             "Reloading..."
           }
         }
@@ -612,8 +610,9 @@ class EngineServerActor[Q, P](
       authenticate(withAccessKeyFromFile) { request =>
         post {
           complete {
+            System.out.println("Stop received")
             context.system.scheduler.scheduleOnce(1.seconds) {
-              context.actorSelection("/user/master") ! StopServer()
+              context.actorSelection("/user/master") ! StopEngineServer()
             }
             "Shutting down..."
           }

@@ -381,6 +381,9 @@ object Storage extends Logging {
   private[predictionio] def getModelDataModels(): Models =
     getDataObjectFromRepo[Models](ModelDataRepository)
 
+  private[predictionio] def getMetaDataClientManifests(): ClientManifests =
+    getDataObjectFromRepo[ClientManifests](MetaDataRepository)
+
   /** Obtains a data access object that returns [[Event]] related local data
     * structure.
     */

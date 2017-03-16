@@ -1,0 +1,25 @@
+{
+  "id": "base",
+  "description": "Default settings",
+  "engineFactory": "com.laserfiche.TextClassificationEngine",
+  "datasource": {
+    "params": {
+      "appName": "INVALID_APP_NAME"
+    }
+  },
+  "preparator": {
+    "params": {
+      "nGram": 1,
+      "numFeatures": 500,
+      "SPPMI": false
+    }
+  },
+  "algorithms": [
+    {
+      "name": "lr",
+      "params": {
+        "regParam": 0.00000005
+      }
+    }
+  ]
+}

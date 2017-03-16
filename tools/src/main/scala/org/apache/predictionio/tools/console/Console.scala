@@ -86,7 +86,7 @@ case class CommonArgs(
   driverPassThrough: Seq[String] = Seq(),
   pioHome: Option[String] = None,
   sparkHome: Option[String] = None,
-  baseEngineURI: String = "",
+  baseEngineURL: String = "",
   engineId: String = "",
   baseEngineId: String = "",
   engineParamsKey: Option[String] = None,
@@ -169,8 +169,8 @@ object Console extends Logging {
       opt[String]("engine-id") abbr("ei") action { (x, c) =>
         c.copy(common = c.common.copy(engineId = x))
       } text("Specify an engine ID. Usually used by distributed deployment.")
-      opt[String]("base-engine-uri") abbr("be") action { (x, c) =>
-        c.copy(common = c.common.copy(baseEngineURI = x))
+      opt[String]("base-engine-url") abbr("be") action { (x, c) =>
+        c.copy(common = c.common.copy(baseEngineURL = x))
       } text("specify the location of base engine")
       opt[String]("base-engine-id") action { (x, c) =>
         c.copy(common = c.common.copy(baseEngineId = x))
@@ -863,7 +863,7 @@ object Console extends Logging {
       error("No engineId specified. Abort engine register")
       return 1
     }
-    val jarFiles = jarFilesForScalaWithBaseEngineURI(ca.common.baseEngineURI)
+    val jarFiles = jarFilesForScalaWithBaseEngineURL(ca.common.baseEngineURL)
     if (jarFiles.isEmpty) {
       error("No engine found. Your build might have failed. Aborting.")
       return 1
@@ -872,7 +872,7 @@ object Console extends Logging {
     val manifest = EngineManifest(
       id = engineId,
       version = engineId,
-      name = new File(ca.common.baseEngineURI).getName,
+      name = new File(ca.common.baseEngineURL).getName,
       description = Some(manifestManualgenTag),
       files = Seq(),
       engineFactory = "")
@@ -1344,9 +1344,9 @@ object Console extends Logging {
     _.getName.toLowerCase.endsWith(".jar")
   }
 
-  def jarFilesForScalaWithBaseEngineURI(baseEngineURI: String): Array[File] = {
-    val libFiles = jarFilesForScalaFilter(jarFilesAt(new File(s"${baseEngineURI}/lib")))
-    val targetFiles = jarFilesForScalaFilter(jarFilesAt(new File(s"${baseEngineURI}/target/scala-${scalaVersionNoPatch}")))
+  def jarFilesForScalaWithBaseEngineURL(baseEngineURL: String): Array[File] = {
+    val libFiles = jarFilesForScalaFilter(jarFilesAt(new File(s"${baseEngineURL}/lib")))
+    val targetFiles = jarFilesForScalaFilter(jarFilesAt(new File(s"${baseEngineURL}/target/scala-${scalaVersionNoPatch}")))
     if(targetFiles.size > 0) targetFiles else libFiles
   }
 

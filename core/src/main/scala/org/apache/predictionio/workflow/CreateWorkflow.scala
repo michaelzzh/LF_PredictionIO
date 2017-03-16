@@ -43,7 +43,7 @@ object CreateWorkflow extends Logging {
   case class WorkflowConfig(
     preDeployment: Boolean = false,
     baseEngineId: String = "",
-    baseEngineURI: String = "",
+    baseEngineURL: String = "",
     deployMode: String = "",
     batch: String = "",
     engineId: String = "",
@@ -94,8 +94,8 @@ object CreateWorkflow extends Logging {
     opt[String]("base-engine-id") required() action { (x, c) =>
       c.copy(baseEngineId = x)
     }
-    opt[String]("base-engine-uri") required() action { (x, c) =>
-      c.copy(baseEngineURI = x)
+    opt[String]("base-engine-url") required() action { (x, c) =>
+      c.copy(baseEngineURL = x)
     }
     opt[String]("engine-variant") required() action { (x, c) =>
       c.copy(engineVariant = x)
@@ -191,8 +191,8 @@ object CreateWorkflow extends Logging {
     ).getOrElse(Map())
 
     if (evaluation.isEmpty) {
-      val variantJson = if(wfc.preDeployment) parse(stringFromFile(s"${wfc.baseEngineURI}/engine.json"))
-                        else parse(updateVariantJson(stringFromFile(s"${wfc.baseEngineURI}/engine.json"), wfc.engineId))
+      val variantJson = if(wfc.preDeployment) parse(stringFromFile(s"${wfc.baseEngineURL}/engine.json"))
+                        else parse(updateVariantJson(stringFromFile(s"${wfc.baseEngineURL}/engine.json"), wfc.engineId))
 
       val engineFactory = if (wfc.engineFactory == "") {
         variantJson \ "engineFactory" match {

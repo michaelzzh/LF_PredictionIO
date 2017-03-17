@@ -154,11 +154,10 @@ class  EventServiceActor(
   def startUpBaseEngines(): Unit = {
     val allEngines = Storage.getMetaDataEngineInstances.getAll
     val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
-    val ports = List(8000, 9000)
     for(engine <- baseEngines){
       Future{
         Process(Seq("pio", "deploy", s"--engine-id ${engine}",
-          s"--variant ${pio_root}/engines/${engine}/engine.json" --port)).!
+          s"--variant ${pio_root}/engines/${engine}/engine.json")).!
       }
       System.out.println(s"Starting up base engine ${engine}")
     } 

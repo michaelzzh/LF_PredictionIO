@@ -37,7 +37,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       engineName text not null,
       description text,
       files text not null,
-      engineFactory text not null)""".execute().apply()
+      engineFactory text not null,
+      port int not null)""".execute().apply()
   }
 
   def insert(m: EngineManifest): Unit = DB localTx { implicit session =>
@@ -48,7 +49,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       ${m.name},
       ${m.description},
       ${m.files.mkString(",")},
-      ${m.engineFactory})""".update().apply()
+      ${m.engineFactory},
+      ${m.port})""".update().apply()
   }
 
   def get(id: String, version: String): Option[EngineManifest] = DB localTx { implicit session =>
@@ -59,7 +61,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       engineName,
       description,
       files,
-      engineFactory
+      engineFactory,
+      port
     FROM $tableName WHERE id = $id AND version = $version""".
       map(resultToEngineManifest).single().apply()
   }
@@ -72,7 +75,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       engineName,
       description,
       files,
-      engineFactory
+      engineFactory,
+      port
     FROM $tableName""".map(resultToEngineManifest).list().apply()
   }
 
@@ -84,7 +88,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
         engineName = ${m.name},
         description = ${m.description},
         files = ${m.files.mkString(",")},
-        engineFactory = ${m.engineFactory}
+        engineFactory = ${m.engineFactory},
+        port = ${m.port}
       where id = ${m.id} and version = ${m.version}""".update().apply()
     }
     if (r == 0) {
@@ -109,6 +114,7 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       name = rs.string("engineName"),
       description = rs.stringOpt("description"),
       files = rs.string("files").split(","),
-      engineFactory = rs.string("engineFactory"))
+      engineFactory = rs.string("engineFactory"),
+      port = rs.int("port"))
   }
 }

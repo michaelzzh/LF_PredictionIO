@@ -40,7 +40,8 @@ case class EngineManifest(
   name: String,
   description: Option[String],
   files: Seq[String],
-  engineFactory: String)
+  engineFactory: String,
+  port: Int)
 
 /** :: DeveloperApi ::
   * Base trait of the [[EngineManifest]] data access object
@@ -81,7 +82,8 @@ class EngineManifestSerializer
         name = "",
         description = None,
         files = Nil,
-        engineFactory = "")
+        engineFactory = "",
+        port = -1)
       fields.foldLeft(seed) { case (enginemanifest, field) =>
         field match {
           case JField("id", JString(id)) => enginemanifest.copy(id = id)
@@ -99,6 +101,8 @@ class EngineManifestSerializer
             ))
           case JField("engineFactory", JString(engineFactory)) =>
             enginemanifest.copy(engineFactory = engineFactory)
+          case JField("port", JInt(port)) =>
+            enginemanifest.copy(port = port.intValue())
           case _ => enginemanifest
         }
       }
@@ -115,6 +119,7 @@ class EngineManifestSerializer
         JField("files",
           JArray(enginemanifest.files.map(x => JString(x)).toList)) ::
         JField("engineFactory", JString(enginemanifest.engineFactory)) ::
+        JField("port", JInt(enginemanifest.port)) ::
         Nil)
   }
 ))

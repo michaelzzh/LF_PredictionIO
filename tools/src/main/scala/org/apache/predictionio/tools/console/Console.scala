@@ -62,6 +62,7 @@ case class ConsoleArgs(
   client: ClientArgs = ClientArgs(),
   common: CommonArgs = CommonArgs(),
   build: BuildArgs = BuildArgs(),
+  register: RegisterArgs = RegisterArgs(),
   app: AppArgs = AppArgs(),
   accessKey: AccessKeyArgs = AccessKeyArgs(),
   deploy: DeployArgs = DeployArgs(),
@@ -141,6 +142,10 @@ case class UpgradeArgs(
 case class ClientArgs(
   id: String = "",
   url: String = ""
+)
+
+case class RegisterArgs(
+  deployPort: Int = 8000
 )
 
 object Console extends Logging {
@@ -254,12 +259,22 @@ object Console extends Logging {
         text("register an instance of the engine at the current directory").
         action { (x, c) =>
           c.copy(commands = c.commands :+"register")
-        }
+        } children(
+          opt[Int]("deploy-port") action { (x, c) =>
+            c.copy(register = c.register.copy(deployPort = x))
+          }
+        )
       note("")
       cmd("unregister").
         text("Unregister an engine at the current directory.").
         action { (_, c) =>
           c.copy(commands = c.commands :+ "unregister")
+        }
+      note("")
+      cmd("deploy-all").
+        text("deploy all base engines").
+        action { (_, c) =>
+          c.copy(commands = c.commands :+ "deploy-all")
         }
       note("")
       cmd("train").
@@ -758,6 +773,8 @@ object Console extends Logging {
           train(ca)
         case Seq("deploy") =>
           deploy(ca)
+        case Seq("deploy-all") =>
+          deployAllBaseEngines(ca)
         case Seq("undeploy") =>
           undeploy(ca)
         case Seq("dashboard") =>
@@ -875,7 +892,8 @@ object Console extends Logging {
       name = new File(ca.common.baseEngineURL).getName,
       description = Some(manifestManualgenTag),
       files = Seq(),
-      engineFactory = "")
+      engineFactory = "",
+      port = ca.register.deployPort)
     RegisterEngine.registerEngineWithManifest(manifest, jarFiles)
     info("Your engine is ready for training.")
     0
@@ -910,6 +928,28 @@ object Console extends Logging {
       ca.common.engineId) { em =>
       RunWorkflow.newRunWorkflow(ca, em)
     }
+  }
+
+  def deployAllBaseEngines(ca: ConsoleArgs): Int = {
+    val pio_root = sys.env("PIO_ROOT")
+    val allEngines = storage.Storage.getMetaDataEngineInstances.getAll
+    val allManifests = storage.Storage.getMetaDataEngineManifests
+    val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
+    for(engine <- baseEngines){
+      allManifests.get(engine, engine) map {manifest =>
+        val port = manifest.port
+        val args = ca.copy(deploy = ca.deploy.copy(port = port), 
+                  common = ca.common.copy(variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"),
+                                        engineId = engine))
+        System.out.println(s"Starting up base engine ${engine} at port ${port}")
+        deploy(args)
+      } getOrElse {
+        error(s"base engine ${engine} not found")
+      }      
+      //Process(Seq("pio", "deploy", s"--engine-id ${engine}",
+      //  s"--variant ${pio_root}/engines/${engine}/engine.json")).!
+    }
+    1 
   }
 
   def deploy(ca: ConsoleArgs): Int = {
@@ -1241,7 +1281,8 @@ object Console extends Logging {
       name = new File(cwd).getName,
       description = Some(manifestAutogenTag),
       files = Seq(),
-      engineFactory = "")
+      engineFactory = "",
+      port = -1)
     try {
       FileUtils.writeStringToFile(json, write(em), "ISO-8859-1")
     } catch {
@@ -1265,7 +1306,8 @@ object Console extends Logging {
       name = new File(cwd).getName,
       description = Some(manifestManualgenTag),
       files = Seq(),
-      engineFactory = "")
+      engineFactory = "",
+      port = -1)
     try {
       FileUtils.writeStringToFile(json, write(em), "ISO-8859-1")
     } catch {

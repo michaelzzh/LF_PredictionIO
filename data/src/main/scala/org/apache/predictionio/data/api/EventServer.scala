@@ -151,18 +151,6 @@ class  EventServiceActor(
       }
   }
 
-  def startUpBaseEngines(): Unit = {
-    val allEngines = Storage.getMetaDataEngineInstances.getAll
-    val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
-    for(engine <- baseEngines){
-      Future{
-        Process(Seq("pio", "deploy", s"--engine-id ${engine}",
-          s"--variant ${pio_root}/engines/${engine}/engine.json")).!
-      }
-      System.out.println(s"Starting up base engine ${engine}")
-    } 
-  }
-
   def registerEngine(engineId: String, accessKey: String, baseEngine: String):String = {
     Process(Seq("pio", "register", s"--engine-id ${engineId}", s"--base-engine-url ${pio_root}/engines/${baseEngine}"),
       new File(s"${pio_root}/engines/${baseEngine}")).!
@@ -691,7 +679,6 @@ class  EventServiceActor(
     }
 
   def receive: Actor.Receive = {
-    startUpBaseEngines()
     runRoute(route)
   }
 }

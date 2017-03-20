@@ -178,6 +178,9 @@ object EngineServer extends Logging {
         val engineVersion = sc.engineVersion.getOrElse(
           engineInstance.engineVersion)
         engineManifests.get(engineId, engineVersion) map { manifest =>
+          if(manifest.port == -1){
+            error("non-base engines are not deployable")
+          }
           val engineFactoryName = engineInstance.engineFactory
           val master = actorSystem.actorOf(Props(
             classOf[EngineServerMasterActor],

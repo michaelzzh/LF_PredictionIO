@@ -54,6 +54,9 @@ import scala.sys.process._
 import scala.util.Random
 import scalaj.http.Http
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import sys.process._
 
 import scopt.Read
 import scopt._
@@ -145,7 +148,7 @@ case class ClientArgs(
 )
 
 case class RegisterArgs(
-  deployPort: Int = 8000
+  deployPort: Int = -1
 )
 
 object Console extends Logging {
@@ -271,10 +274,10 @@ object Console extends Logging {
           c.copy(commands = c.commands :+ "unregister")
         }
       note("")
-      cmd("deploy-all").
+      cmd("deploy-base-engine").
         text("deploy all base engines").
         action { (_, c) =>
-          c.copy(commands = c.commands :+ "deploy-all")
+          c.copy(commands = c.commands :+ "deploy-base-engine")
         }
       note("")
       cmd("train").
@@ -773,8 +776,8 @@ object Console extends Logging {
           train(ca)
         case Seq("deploy") =>
           deploy(ca)
-        case Seq("deploy-all") =>
-          deployAllBaseEngines(ca)
+        case Seq("deploy-base-engine") =>
+          deployBaseEngine(ca)
         case Seq("undeploy") =>
           undeploy(ca)
         case Seq("dashboard") =>
@@ -930,27 +933,52 @@ object Console extends Logging {
     }
   }
 
-  def deployAllBaseEngines(ca: ConsoleArgs): Int = {
+  def deployBaseEngine(ca: ConsoleArgs): Int = {
     val pio_root = sys.env("PIO_ROOT")
-    val allEngines = storage.Storage.getMetaDataEngineInstances.getAll
+    val engine = ca.common.engineId
     val allManifests = storage.Storage.getMetaDataEngineManifests
-    val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
-    for(engine <- baseEngines){
-      allManifests.get(engine, engine) map {manifest =>
+    allManifests.get(engine, engine) map {manifest =>
         val port = manifest.port
-        val args = ca.copy(deploy = ca.deploy.copy(port = port), 
-                  common = ca.common.copy(variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"),
-                                        engineId = engine))
+        val args = ca.copy(deploy = ca.deploy.copy(port = port),
+                      common = ca.common.copy(variantJson = new File(s"${pio_root}/engines/${engine}/engine.json")))
         System.out.println(s"Starting up base engine ${engine} at port ${port}")
         deploy(args)
       } getOrElse {
-        error(s"base engine ${engine} not found")
-      }      
-      //Process(Seq("pio", "deploy", s"--engine-id ${engine}",
-      //  s"--variant ${pio_root}/engines/${engine}/engine.json")).!
-    }
-    1 
+        error(s"no engine masnifest found for ${engine}")
+      }
+    1
   }
+
+  // def deployBaseEngines(ca: ConsoleArgs): Int = {
+  //   val pio_root = sys.env("PIO_ROOT")
+  //   val allEngines = storage.Storage.getMetaDataEngineInstances.getAll
+  //   val allManifests = storage.Storage.getMetaDataEngineManifests
+  //   val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
+  //   for(engine <- baseEngines){
+  //       allManifests.get(engine, engine) map {manifest =>
+  //         val port = manifest.port
+  //         //val args = ca.copy(deploy = ca.deploy.copy(port = port), 
+  //         //        common = ca.common.copy(variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"),
+  //         //                              engineId = engine))
+  //         Future{
+  //           System.out.println(s"Starting up base engine ${engine} at port ${port}")
+  //           val stream = Process(Seq("pio", 
+  //                                   "deploy", 
+  //                                   s"--port $port", 
+  //                                   s"--variant ${pio_root}/engines/${engine}/engine.json", 
+  //                                   s"--engine-id ${engine}")).lines
+  //           stream foreach println
+  //         }
+  //         //System.out.println(s"Starting up base engine ${engine} at port ${port}")
+  //         //deploy(args)
+  //         } getOrElse {
+  //           error(s"base engine ${engine} not found")
+  //         }         
+  //     //Process(Seq("pio", "deploy", s"--engine-id ${engine}",
+  //     //  s"--variant ${pio_root}/engines/${engine}/engine.json")).!
+  //   }
+  //   1 
+  // }
 
   def deploy(ca: ConsoleArgs): Int = {
     Template.verifyTemplateMinVersion(new File("template.json"))

@@ -1,10 +1,10 @@
 #This script is for building and training base engines, 
 declare -A engines
 engines["baseClassification"]=8080
+engines["baseTextClassification"]=9000
 
 for engine in ${!engines[@]}
 do
-	port = engines[${engine}]
 	(cd $PIO_ROOT/engines/$engine; pio build --verbose)
 	(cd $PIO_ROOT/engines/$engine; pio register --engine-id $engine \
 		--base-engine-url $PIO_ROOT/engines/$engine \

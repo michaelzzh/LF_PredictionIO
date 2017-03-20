@@ -151,6 +151,35 @@ class  EventServiceActor(
       }
   }
 
+  def startUpBaseEngines(): Unit = {
+    val allEngines = Storage.getMetaDataEngineInstances.getAll
+    val allManifests = Storage.getMetaDataEngineManifests
+    val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
+    for(engine <- baseEngines){
+        allManifests.get(engine, engine) map {manifest =>
+          val port = manifest.port
+          Future{
+            System.out.println(s"Starting up base engine ${engine} at port ${port}")
+            val stream = Process(Seq("pio", 
+                                    "deploy", 
+                                    s"--port $port", 
+                                    s"--variant ${pio_root}/engines/${engine}/engine.json", 
+                                    s"--engine-id ${engine}")).lines
+            stream foreach println
+          }
+          //System.out.println(s"Starting up base engine ${engine} at port ${port}")
+          //deploy(args)
+        } getOrElse {
+          error(s"base engine ${engine} not found")
+        }
+      // Future{
+      //   Process(Seq("pio", "deploy", s"--engine-id ${engine}",
+      //     s"--variant ${pio_root}/engines/${engine}/engine.json")).!
+      // }
+      // System.out.println(s"Starting up base engine ${engine}")
+    } 
+  }
+
   def registerEngine(engineId: String, accessKey: String, baseEngine: String):String = {
     Process(Seq("pio", "register", s"--engine-id ${engineId}", s"--base-engine-url ${pio_root}/engines/${baseEngine}"),
       new File(s"${pio_root}/engines/${baseEngine}")).!
@@ -679,6 +708,7 @@ class  EventServiceActor(
     }
 
   def receive: Actor.Receive = {
+    startUpBaseEngines()
     runRoute(route)
   }
 }

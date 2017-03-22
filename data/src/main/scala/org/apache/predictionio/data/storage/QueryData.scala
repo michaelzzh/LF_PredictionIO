@@ -5,5 +5,15 @@ import org.apache.predictionio.annotation.DeveloperApi
 case class QueryData(
 	val clientId: String,
 	val engineId: String,
-	val properties: List[String] = List()
+	val properties: List[QueryEntry] = List()
+)
+
+case class QueryEntry(
+	val queryId: String,
+	val queryString: String
+)
+
+case class ResultEntry(
+	val queryId: String,
+	val resultString: String
 )

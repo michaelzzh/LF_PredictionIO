@@ -143,6 +143,7 @@ object Storage extends Logging {
   private val EventDataRepository = "EVENTDATA"
   private val ModelDataRepository = "MODELDATA"
   private val MetaDataRepository = "METADATA"
+  private val HistoryDataRepository = "HISTORYDATA"
 
   private val repositoriesPrefix = "PIO_STORAGE_REPOSITORIES"
 
@@ -339,6 +340,7 @@ object Storage extends Logging {
     info("Verifying Meta Data Backend (Source: " +
       s"${repositoriesToDataObjectMeta(MetaDataRepository).sourceName})...")
     getMetaDataEngineManifests()
+    getMetaDataClientManifests()
     getMetaDataEngineInstances()
     getMetaDataEvaluationInstances()
     getMetaDataApps()
@@ -346,6 +348,9 @@ object Storage extends Logging {
     info("Verifying Model Data Backend (Source: " +
       s"${repositoriesToDataObjectMeta(ModelDataRepository).sourceName})...")
     getModelDataModels()
+    info("Verifying History Data Backend (Source: " +
+      s"${repositoriesToDataObjectMeta(HistoryDataRepository).sourceName})...")
+    getHistoryDataQueryHistories()
     info("Verifying Event Data Backend (Source: " +
       s"${repositoriesToDataObjectMeta(EventDataRepository).sourceName})...")
     val eventsDb = getLEvents(test = true)
@@ -383,6 +388,9 @@ object Storage extends Logging {
 
   private[predictionio] def getMetaDataClientManifests(): ClientManifests =
     getDataObjectFromRepo[ClientManifests](MetaDataRepository)
+
+  private[predictionio] def getHistoryDataQueryHistories(): QueryHistories =
+    getDataObjectFromRepo[QueryHistories](HistoryDataRepository)
 
   /** Obtains a data access object that returns [[Event]] related local data
     * structure.

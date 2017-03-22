@@ -40,7 +40,7 @@ class JDBCClientManifests(client: String, config: StorageClientConfig, prefix: S
   def update(i: ClientManifest): Unit = DB localTx { implicit session =>
     sql"""
     update $tableName set
-      clientid = {i.clientId}
+      clientid = {i.clientId},
       url = ${i.url}
     where id = ${i.id}""".update().apply()
   }

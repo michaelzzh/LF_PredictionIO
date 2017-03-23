@@ -5,6 +5,7 @@ import org.apache.predictionio.annotation.DeveloperApi
 case class QueryData(
 	val clientId: String,
 	val engineId: String,
+	val groupId: String,
 	val properties: List[QueryEntry] = List()
 )
 

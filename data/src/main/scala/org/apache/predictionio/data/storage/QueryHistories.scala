@@ -14,6 +14,7 @@ import org.json4s._
 @DeveloperApi
 case class QueryHistory( 
 	id: String,
+	groupId: String,
 	status: String,
 	query: String,
 	result: String)
@@ -23,6 +24,8 @@ trait QueryHistories {
 	def insert(queryHistory: QueryHistory): Unit
 
 	def get(id: String): Option[QueryHistory]
+
+	def getGroup(groupId: String): List[QueryHistory]
 
 	def update(queryInfo: QueryHistory): Unit
 
@@ -36,12 +39,14 @@ class QueryHistorySerializer
 		case JObject(fields) =>
 			val seed = QueryHistory(
 				id = "",
+				groupId = "",
 				status = "",
 				query = "",
 				result = "")
 			fields.foldLeft(seed) {case (queryHistory, field) =>
 				field match {
 					case JField("id", JString(id)) => queryHistory.copy(id = id)
+					case JField("groupId", JString(groupId)) => queryHistory.copy(groupId = groupId)
 					case JField("status", JString(status)) => queryHistory.copy(status = status)
 					case JField("query", JString(query)) => queryHistory.copy(query = query)
 					case JField("result", JString(result)) => queryHistory.copy(result = result)
@@ -53,6 +58,7 @@ class QueryHistorySerializer
 		case queryHistory: QueryHistory =>
 			JObject(
 				JField("id", JString(queryHistory.id)) ::
+				JField("groupId", JString(queryHistory.groupId)) ::
 				JField("status", JString(queryHistory.status)) ::
 				JField("query", JString(queryHistory.query)) ::
 				JField("result", JString(queryHistory.result)) ::

@@ -15,6 +15,7 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
     sql"""
     create table if not exists $tableName (
       id varchar(100) not null primary key,
+      groupid text not null,
       status text not null,
       query text not null,
       result text not null)""".execute().apply()
@@ -24,6 +25,7 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
     sql"""
     INSERT INTO $tableName VALUES(
       ${i.id},
+      ${i.groupId},
       ${i.status},
       ${i.query},
       ${i.result})""".update().apply()
@@ -33,15 +35,31 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
     sql"""
     SELECT
       id,
+      groupid,
       status,
       query,
       result
     FROM $tableName WHERE id = $queryId""".map(resultToQueryHistory).single().apply()
   }
 
+  def getGroup(groupId: String): List[QueryHistory] = DB localTx { implicit session =>
+    sql"""
+    SELECT
+      id,
+      groupid,
+      status,
+      query,
+      result
+    FROM $tableName 
+    WHERE 
+      groupid = $groupId AND
+      status = 'COMPLETED'""".map(resultToQueryHistory).list().apply()
+  }
+
   def update(i: QueryHistory): Unit = DB localTx { implicit session =>
     sql"""
     update $tableName set
+      groupid = ${i.groupId},
       status = ${i.status},
       query = ${i.query},
       result = ${i.result}
@@ -56,6 +74,7 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
   def resultToQueryHistory(rs: WrappedResultSet): QueryHistory = {
     QueryHistory(
       id = rs.string("id"),
+      groupId = rs.string("groupid"),
       status = rs.string("status"),
       query = rs.string("query"),
       result = rs.string("result"))

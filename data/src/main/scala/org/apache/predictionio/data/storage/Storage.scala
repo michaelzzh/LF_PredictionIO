@@ -392,6 +392,9 @@ object Storage extends Logging {
   private[predictionio] def getHistoryDataQueryHistories(): QueryHistories =
     getDataObjectFromRepo[QueryHistories](HistoryDataRepository)
 
+  private[predictionio] def getHistoryDataQueryGroupHistories(): QueryGroupHistories =
+    getDataObjectFromRepo[QueryGroupHistories](HistoryDataRepository)
+
   /** Obtains a data access object that returns [[Event]] related local data
     * structure.
     */

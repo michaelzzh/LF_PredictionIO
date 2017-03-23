@@ -31,6 +31,7 @@ import org.apache.predictionio.data.storage.EngineInstance
 import org.apache.predictionio.data.storage.EngineManifest
 import org.apache.predictionio.data.storage.ClientManifest
 import org.apache.predictionio.data.storage.QueryHistory
+import org.apache.predictionio.data.storage.QueryGroupHistory
 import org.apache.predictionio.data.storage.Storage
 import org.apache.predictionio.data.storage.QueryData
 import org.apache.predictionio.data.storage.QueryEntry
@@ -438,6 +439,7 @@ class EngineServerActor[Q, P](
             val requestStartTime = DateTime.now
           	val engineId = qd.engineId
             val queries = qd.properties
+            val queryGroupId = qd.groupId
             val clientId = qd.clientId
             try {
               var engineInstanceId = ""
@@ -446,6 +448,7 @@ class EngineServerActor[Q, P](
               val replyAddress = client.url
               val modeldata = Storage.getModelDataModels
               val queryHistories = Storage.getHistoryDataQueryHistories
+              val queryGroupHistories = Storage.getHistoryDataQueryGroupHistories
               val engineInstances = Storage.getMetaDataEngineInstances
       		    val engineInstance = engineInstances.getLatestCompleted(engineId, engineId, "default") getOrElse {error(
             			s"No valid engine instance found for engine ${engineId} "
@@ -472,22 +475,30 @@ class EngineServerActor[Q, P](
       		  	  params = WorkflowParams()
       		    )
 
-
               Future{
-                var responseList = ListBuffer[ResultEntry]()
-                for(singleQuery <- queries){
-                  val queryString = singleQuery.queryString
-                  val queryId = singleQuery.queryId
+                var responseList = List[ResultEntry]()
 
-                  queryHistories.get(queryId) map {queryHistory =>
-                    //if queryId already exists in the db, grab the result directly
-                    val resultEntry = ResultEntry(queryId = queryId,
-                                            resultString = queryHistory.result)
-                    responseList += resultEntry
-                  } getOrElse {
+                queryGroupHistories.getCompleted(queryGroupId, engineId) map { groupHistory => 
+                  responseList = queryHistories.getGroup(groupHistory.groupId).map(gh => ResultEntry(queryId = gh.id, resultString = gh.result))
+                } getOrElse {
+                  var queriesDone = 0.0
+                  val querySize = queries.size.toDouble
+                  var responseBuffer = ListBuffer[ResultEntry]()
+
+                  var groupHistory = QueryGroupHistory(groupId = queryGroupId,
+                                                      engineId = engineId,
+                                                      status = "INIT",
+                                                      progress = 0.0)
+                  queryGroupHistories.insert(groupHistory)
+                  var lastRecordedTime = DateTime.now
+                  for(singleQuery <- queries){
+                    val queryString = singleQuery.queryString
+                    val queryId = singleQuery.queryId
+
                     val singleServingStartTime = DateTime.now
 
                     val queryHistory = QueryHistory(id = queryId,
+                                                groupId = queryGroupId,
                                                 status = "INIT",
                                                 query = queryString,
                                                 result = "")
@@ -530,7 +541,7 @@ class EngineServerActor[Q, P](
                         p.process(engineInstance, queryJValue, r, pluginContext)
                       }
 
-                    val newHist = queryHistory.copy(status = "COMPLETE",
+                    val newHist = queryHistory.copy(status = "COMPLETED",
                                     result = compact(render(pluginResult)))
 
                     queryHistories.update(newHist)
@@ -538,27 +549,37 @@ class EngineServerActor[Q, P](
                     val resultEntry = ResultEntry(queryId = queryId,
                                                 resultString = compact(render(pluginResult)))
 
-                    responseList += resultEntry
+                    responseBuffer += resultEntry
+
+                    queriesDone += 1.0
 
                     // Bookkeeping
                     val servingEndTime = DateTime.now
-                    lastServingSec =
-                      (servingEndTime.getMillis - singleServingStartTime.getMillis) * 1.0
-                    avgServingSec =
-                      ((avgServingSec * requestCount) + lastServingSec) /
-                      (requestCount + 1)
-                    requestCount += 1
-                      //System.out.println(s"query time: ${lastServingSec}, average query time: ${avgServingSec}")
+                    // lastServingSec =
+                    //   (servingEndTime.getMillis - singleServingStartTime.getMillis) * 1.0
+                    // avgServingSec =
+                    //   ((avgServingSec * requestCount) + lastServingSec) /
+                    //   (requestCount + 1)
+                    // requestCount += 1
+
+                    if ((servingEndTime.getMillis - lastRecordedTime.getMillis) / 1000 >= 1.0) {
+                      lastRecordedTime = servingEndTime
+                      var queryProgress = queriesDone / querySize
+                      groupHistory = groupHistory.copy(progress = queryProgress)
+                      queryGroupHistories.update(groupHistory)                      
+                    }
                   }
+                  groupHistory = groupHistory.copy(status = "COMPLETED", progress = 1.0)
+                  queryGroupHistories.update(groupHistory)
+                  responseList = responseBuffer.toList
                 }
 
                 val data = Map(
-                  // "appId" -> dataSourceParams.asInstanceOf[ParamsWithAppId].appId,
-                  "response" -> responseList.toList.map(result => Map("queryId" -> result.queryId,
+                  "response" -> responseList.map(result => Map("queryId" -> result.queryId,
 
                                                                       "resultString" -> result.resultString))
                 )
-                // At this point args.accessKey should be Some(String).
+
                 val f: Future[Int] = future {
                   scalaj.http.Http(
                     s"${replyAddress}").postData(
@@ -567,7 +588,7 @@ class EngineServerActor[Q, P](
                 }
                 f onComplete {
                   case Success(code) => {
-                    if (code != 201) {
+                    if (code != 200) {
                       log.error(s"send back response failed. Status code: $code."
                         + s"Data: ${write(data)}.")
                     }
@@ -578,12 +599,11 @@ class EngineServerActor[Q, P](
                 val requestEndTime = DateTime.now
                 val totalRequestTime =
                   (requestEndTime.getMillis - requestStartTime.getMillis) / 1000.0
-                System.out.println(s"total serving time: ${totalRequestTime} seconds, average query time: ${avgServingSec} milliseconds, items in this batch: ${queries.size}")
+                val average = totalRequestTime * 1000 / queries.size
+                System.out.println(s"total serving time: ${totalRequestTime} seconds, average query time: ${average} milliseconds, items in this batch: ${queries.size}")
               }
               complete("query being performed")
-              // respondWithMediaType(`application/json`) {
-              //   complete(compact(render(pluginResult)))
-              // }
+
             } catch {
               case e: MappingException =>
                 log.error(

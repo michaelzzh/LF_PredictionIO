@@ -4,7 +4,8 @@ import org.apache.predictionio.annotation.DeveloperApi
 import org.json4s._
 
 /** :: DeveloperApi ::
-  * Provides a way to discover historic queries by queryIds
+  * DataAccess object for queryGroupHistories. Past query groups can be retrieved using groupId and engineId. 
+  * 
   *
   *@param id Unique identifier of a query
   *@param status query status flag
@@ -19,7 +20,7 @@ case class QueryGroupHistory(
 
 @DeveloperApi
 trait QueryGroupHistories {
-	def insert(queryHistory: QueryGroupHistory): Unit
+	def insert(queryHistory: QueryGroupHistory): String
 
 	def get(groupId: String, engineId: String): Option[QueryGroupHistory]
 

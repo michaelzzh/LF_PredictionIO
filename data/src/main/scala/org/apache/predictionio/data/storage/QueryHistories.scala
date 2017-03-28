@@ -21,7 +21,7 @@ case class QueryHistory(
 
 @DeveloperApi
 trait QueryHistories {
-	def insert(queryHistory: QueryHistory): Unit
+	def insert(queryHistory: QueryHistory): String
 
 	def get(id: String): Option[QueryHistory]
 

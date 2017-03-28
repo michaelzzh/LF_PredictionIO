@@ -20,13 +20,15 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
       progress real not null)""".execute().apply()
   }
 
-  def insert(i: QueryGroupHistory): Unit = DB localTx { implicit session =>
+  def insert(i: QueryGroupHistory): String = DB localTx { implicit session =>
+    val id = java.util.UUID.randomUUID().toString
     sql"""
     INSERT INTO $tableName VALUES(
-      ${i.groupId},
+      ${id},
       ${i.engineId},
       ${i.status},
       ${i.progress})""".update().apply()
+    id
   }
 
   def get(groupId: String, engineId: String): Option[QueryGroupHistory] = DB localTx { implicit session =>
@@ -36,7 +38,7 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
       engineid,
       status,
       progress
-    FROM $tableName WHERE id = $groupId AND engineid = $engineId""".map(resultToQueryGroupHistory).single().apply()
+    FROM $tableName WHERE groupid = $groupId AND engineid = $engineId""".map(resultToQueryGroupHistory).single().apply()
   }
 
   def getCompleted(groupId: String, engineId: String): Option[QueryGroupHistory] = DB localTx { implicit session =>

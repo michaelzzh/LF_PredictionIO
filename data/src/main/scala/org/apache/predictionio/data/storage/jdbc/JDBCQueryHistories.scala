@@ -21,14 +21,16 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
       result text not null)""".execute().apply()
   }
 
-  def insert(i: QueryHistory): Unit = DB localTx { implicit session =>
+  def insert(i: QueryHistory): String = DB localTx { implicit session =>
+    val id = java.util.UUID.randomUUID().toString
     sql"""
     INSERT INTO $tableName VALUES(
-      ${i.id},
+      ${id},
       ${i.groupId},
       ${i.status},
       ${i.query},
       ${i.result})""".update().apply()
+    id
   }
 
   def get(queryId: String): Option[QueryHistory] = DB localTx { implicit session =>

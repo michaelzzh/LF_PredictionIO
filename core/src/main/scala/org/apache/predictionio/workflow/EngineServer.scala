@@ -36,6 +36,7 @@ import org.apache.predictionio.data.storage.Storage
 import org.apache.predictionio.data.storage.QueryData
 import org.apache.predictionio.data.storage.QueryEntry
 import org.apache.predictionio.data.storage.ResultEntry
+import org.apache.predictionio.data.storage.ResultData
 import org.apache.predictionio.data.api.Common
 import org.apache.predictionio.workflow.JsonExtractorOption.JsonExtractorOption
 import org.json4s._
@@ -440,69 +441,87 @@ class EngineServerActor[Q, P](
           	val engineId = qd.engineId
             val queries = qd.properties
             val queryGroupId = qd.groupId
-            val clientId = qd.clientId
+
+            val queryHistories = Storage.getHistoryDataQueryHistories
+            val queryGroupHistories = Storage.getHistoryDataQueryGroupHistories
+
             try {
-              var engineInstanceId = ""
 
-              val client = Storage.getMetaDataClientManifests.get(clientId) getOrElse {error(s"No existing client for client id $clientId")}
-              val replyAddress = client.url
-              val modeldata = Storage.getModelDataModels
-              val queryHistories = Storage.getHistoryDataQueryHistories
-              val queryGroupHistories = Storage.getHistoryDataQueryGroupHistories
-              val engineInstances = Storage.getMetaDataEngineInstances
-      		    val engineInstance = engineInstances.getLatestCompleted(engineId, engineId, "default") getOrElse {error(
-            			s"No valid engine instance found for engine ${engineId} "
-            		)}
-      		    engineInstanceId = engineInstance.id
+              var responseList = List[ResultEntry]()
+              var resultData = ResultData()
 
-      		    val engineParams = engine.engineInstanceToEngineParams(engineInstance, args.jsonExtractor)
+              queryGroupHistories.get(queryGroupId, engineId) map { groupHistory => 
+                if(groupHistory.status == "COMPLETED"){
+                    responseList = queryHistories.getGroup(groupHistory.groupId).map(qh => ResultEntry(queryId = qh.id, resultString = qh.result))
+                    resultData = ResultData(groupId = queryGroupId,
+                                            status = "COMPLETED",
+                                            progress = 1.0,
+                                            predictions = responseList)
+                }else{
+                  resultData = ResultData(groupId = queryGroupId,
+                                          status = groupHistory.status,
+                                          progress = groupHistory.progress)
+                }
+                
+              } getOrElse {
 
-      		    val algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
-      				  Doer(engine.algorithmClassMap(n), p)
-    		      }
 
-    		      val servingParamsWithName = engineParams.servingParams
+                var engineInstanceId = ""
 
-    		      val serving = Doer(engine.servingClassMap(servingParamsWithName._1),
-      		  	servingParamsWithName._2)
+                val modeldata = Storage.getModelDataModels
+                val engineInstances = Storage.getMetaDataEngineInstances
+                val engineInstance = engineInstances.getLatestCompleted(engineId, engineId, "default") getOrElse {error(
+                  s"No valid engine instance found for engine ${engineId} "
+                )}
+                engineInstanceId = engineInstance.id
 
-      		    val modelsFromEngineInstance = kryo.invert(modeldata.get(engineInstance.id).get.models).get.asInstanceOf[Seq[Any]]
-      		    val models = engine.prepareDeploy(
-      		  	  sparkContext,
-      		  	  engineParams,
-      		  	  engineInstanceId,
-      		  	  modelsFromEngineInstance,
-      		  	  params = WorkflowParams()
-      		    )
+                val engineParams = engine.engineInstanceToEngineParams(engineInstance, args.jsonExtractor)
 
-              Future{
-                var responseList = List[ResultEntry]()
+                val algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
+                  Doer(engine.algorithmClassMap(n), p)
+                }
 
-                queryGroupHistories.getCompleted(queryGroupId, engineId) map { groupHistory => 
-                  responseList = queryHistories.getGroup(groupHistory.groupId).map(gh => ResultEntry(queryId = gh.id, resultString = gh.result))
-                } getOrElse {
+                val servingParamsWithName = engineParams.servingParams
+
+                val serving = Doer(engine.servingClassMap(servingParamsWithName._1),
+                servingParamsWithName._2)
+
+                val modelsFromEngineInstance = kryo.invert(modeldata.get(engineInstance.id).get.models).get.asInstanceOf[Seq[Any]]
+                val models = engine.prepareDeploy(
+                  sparkContext,
+                  engineParams,
+                  engineInstanceId,
+                  modelsFromEngineInstance,
+                  params = WorkflowParams()
+                )
+
+                //val newId = java.util.UUID.randomUUID().toString
+                var groupHistory = QueryGroupHistory(groupId = "",
+                                                      engineId = engineId,
+                                                      status = "INIT",
+                                                      progress = 0.0)
+                val newId = queryGroupHistories.insert(groupHistory)
+                resultData = ResultData(groupId = newId,
+                                          status = groupHistory.status,
+                                          progress = groupHistory.progress)
+
+                Future{
                   var queriesDone = 0.0
                   val querySize = queries.size.toDouble
                   var responseBuffer = ListBuffer[ResultEntry]()
 
-                  var groupHistory = QueryGroupHistory(groupId = queryGroupId,
-                                                      engineId = engineId,
-                                                      status = "INIT",
-                                                      progress = 0.0)
-                  queryGroupHistories.insert(groupHistory)
                   var lastRecordedTime = DateTime.now
                   for(singleQuery <- queries){
                     val queryString = singleQuery.queryString
-                    val queryId = singleQuery.queryId
 
                     val singleServingStartTime = DateTime.now
 
-                    val queryHistory = QueryHistory(id = queryId,
-                                                groupId = queryGroupId,
+                    val queryHistory = QueryHistory(id = "",
+                                                groupId = newId,
                                                 status = "INIT",
                                                 query = queryString,
                                                 result = "")
-                    queryHistories.insert(queryHistory)
+                    val queryId = queryHistories.insert(queryHistory)
 
                     // Extract Query from Json
                     val query = JsonExtractor.extract(
@@ -541,7 +560,8 @@ class EngineServerActor[Q, P](
                         p.process(engineInstance, queryJValue, r, pluginContext)
                       }
 
-                    val newHist = queryHistory.copy(status = "COMPLETED",
+                    val newHist = queryHistory.copy(id = queryId,
+                                    status = "COMPLETED",
                                     result = compact(render(pluginResult)))
 
                     queryHistories.update(newHist)
@@ -562,47 +582,33 @@ class EngineServerActor[Q, P](
                     //   (requestCount + 1)
                     // requestCount += 1
 
-                    if ((servingEndTime.getMillis - lastRecordedTime.getMillis) / 1000 >= 1.0) {
+                    if ((servingEndTime.getMillis - lastRecordedTime.getMillis) >= 500) {
                       lastRecordedTime = servingEndTime
                       var queryProgress = queriesDone / querySize
-                      groupHistory = groupHistory.copy(progress = queryProgress)
+                      groupHistory = groupHistory.copy(groupId = newId, progress = queryProgress)
                       queryGroupHistories.update(groupHistory)                      
                     }
                   }
-                  groupHistory = groupHistory.copy(status = "COMPLETED", progress = 1.0)
+                  groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0)
                   queryGroupHistories.update(groupHistory)
                   responseList = responseBuffer.toList
+                
+                  val requestEndTime = DateTime.now
+                  val totalRequestTime =
+                    (requestEndTime.getMillis - requestStartTime.getMillis) / 1000.0
+                  val average = totalRequestTime * 1000 / queries.size
+                  System.out.println(s"total serving time: ${totalRequestTime} seconds, average query time: ${average} milliseconds, items in this batch: ${queries.size}")
                 }
-
-                val data = Map(
-                  "response" -> responseList.map(result => Map("queryId" -> result.queryId,
-
-                                                                      "resultString" -> result.resultString))
-                )
-
-                val f: Future[Int] = future {
-                  scalaj.http.Http(
-                    s"${replyAddress}").postData(
-                    write(data)).header(
-                    "content-type", "application/json").asString.code
-                }
-                f onComplete {
-                  case Success(code) => {
-                    if (code != 200) {
-                      log.error(s"send back response failed. Status code: $code."
-                        + s"Data: ${write(data)}.")
-                    }
-                  }
-                  case Failure(t) => {
-                    log.error(s"send back response failed: ${t.getMessage}") }
-                  }
-                val requestEndTime = DateTime.now
-                val totalRequestTime =
-                  (requestEndTime.getMillis - requestStartTime.getMillis) / 1000.0
-                val average = totalRequestTime * 1000 / queries.size
-                System.out.println(s"total serving time: ${totalRequestTime} seconds, average query time: ${average} milliseconds, items in this batch: ${queries.size}")
               }
-              complete("query being performed")
+              val formatedData = Map(
+                "groupId" -> resultData.groupId,
+                "status" -> resultData.status,
+                "progress" -> resultData.progress,
+                "predictions" -> resultData.predictions.map(re => Map("queryId" -> re.queryId, "resultString" -> re.resultString))
+              )
+              respondWithMediaType(`application/json`) {
+                complete(write(formatedData))
+              }
 
             } catch {
               case e: MappingException =>

@@ -167,16 +167,9 @@ class  EventServiceActor(
                                     s"--engine-id ${engine}")).lines
             stream foreach println
           }
-          //System.out.println(s"Starting up base engine ${engine} at port ${port}")
-          //deploy(args)
         } getOrElse {
           error(s"base engine ${engine} not found")
         }
-      // Future{
-      //   Process(Seq("pio", "deploy", s"--engine-id ${engine}",
-      //     s"--variant ${pio_root}/engines/${engine}/engine.json")).!
-      // }
-      // System.out.println(s"Starting up base engine ${engine}")
     } 
   }
 
@@ -196,6 +189,10 @@ class  EventServiceActor(
     s"engine ${engineId} removed"
   }
 
+  def deleteEngineData(engineId: String):String = {
+    Process(Seq("pio", "app", "data-delete", engineId, "-f")).!
+    s"engine ${engineId} data deleted"
+  }
   def trainEngine(engineId: String, baseEngine: String) = {
     val training: Future[String] = Future {
       val stream = Process(Seq(
@@ -212,11 +209,12 @@ class  EventServiceActor(
     }
 
     training onComplete {
-      case Success(engineId) => {
-  
-      }
       case Failure(t) => println("An error has occured at train: " + t.getMessage)
     }
+  }
+
+  def getTrainStatus(engineId: String) = {
+
   }
 
   private val FailedAuth = Left(
@@ -463,22 +461,8 @@ class  EventServiceActor(
         }
       }
     } ~
-    path("engine" / "register") {
+    path("engine") {
       import Json4sProtocol._
-      post{
-        handleExceptions(Common.exceptionHandler) {
-          handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              complete {
-                val engineId = data.engineId
-                val accessKey = data.accessKey
-                val baseEngine = data.baseEngine
-                registerEngine(engineId, accessKey, baseEngine)
-              }
-            }
-          }
-        }
-      }~
       delete {
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
@@ -491,6 +475,22 @@ class  EventServiceActor(
           }
         }
       }
+    }~
+    path("engine" / "register") {
+      import Json4sProtocol._
+      post{
+        handleExceptions(Common.exceptionHandler) {
+          handleRejections(rejectionHandler) {
+            entity(as[EngineData]) {data =>
+              complete {
+                val engineId = data.engineId
+                val baseEngine = data.baseEngine
+                registerEngine(engineId, engineId, baseEngine)
+              }
+            }
+          }
+        }
+      }  
     }~
     path("engine" / "train"){
       import Json4sProtocol._

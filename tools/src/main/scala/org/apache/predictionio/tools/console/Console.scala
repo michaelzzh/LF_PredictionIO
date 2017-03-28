@@ -558,6 +558,19 @@ object Console extends Logging {
               } text("Name of the app to be shown.")
             ),
           note(""),
+          cmd("clean-delete").
+            text("delete all meta-data and models of an app").
+            action { (_, c) =>
+              c.copy(commands = c.commands :+ "clean-delete")
+            } children(
+              arg[String]("<name>") action { (x, c) =>
+                c.copy(app = c.app.copy(name = x))
+              } text("Name of the app to be deleted."),
+              opt[Unit]("force") abbr("f") action { (x, c) =>
+                c.copy(app = c.app.copy(force = true))
+              } text("Delete an app completely without prompting for confirmation")
+            ),
+          note(""),
           cmd("delete").
             text("Delete an app.").
             action { (_, c) =>
@@ -805,6 +818,9 @@ object Console extends Logging {
           App.show(ca)
         case Seq("app", "delete") =>
           App.delete(ca)
+        case Seq("app", "clean-delete") =>
+          App.delete(ca)
+          //clearAllAppData(ca)
         case Seq("app", "data-delete") =>
           App.dataDelete(ca)
         case Seq("app", "channel-new") =>

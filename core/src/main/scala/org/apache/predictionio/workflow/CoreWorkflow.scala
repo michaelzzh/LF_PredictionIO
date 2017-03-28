@@ -89,6 +89,12 @@ object CoreWorkflow {
         status = "COMPLETED",
         endTime = DateTime.now
         ))
+      val engineManifests = Storage.getMetaDataEngineManifests
+      engineManifests.get(engineInstance.engineId, engineInstance.engineVersion) map {em =>
+        engineManifests.update(em.copy(trainingStatus = "COMPLETED"))
+      } getOrElse {
+        error("engine manifest not found for ${engineInstance.engineId}")
+      }
       if(!preDeployment){
         logger.info("Training completed successfully.")
       }else{

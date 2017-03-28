@@ -100,6 +100,32 @@ class ESEngineInstances(client: Client, config: StorageClientConfig, index: Stri
     }
   }
 
+  def getWithEngineId(engineId: String): Option[EngineInstance] = {
+    try {
+      val builder = client.prepareSearch(index).setTypes(estype).setPostFilter(
+        andFilter(
+          termFilter("engineId", engineId)))
+      ESUtils.getAll[EngineInstance](client, builder).headOption
+    } catch {
+      case e: ElasticsearchException =>
+        error(e.getMessage)
+        None
+    }
+  }
+
+  def getBaseEngines(): Seq[String] = {
+    try {
+      val builder = client.prepareSearch(index).setTypes(estype).setPostFilter(
+        andFilter(
+          termFilter("variant", "base")))
+      ESUtils.getAll[EngineInstance](client, builder).map(ei => ei.engineId)
+    } catch {
+      case e: ElasticsearchException =>
+        error(e.getMessage)
+        Seq()
+    }
+  }
+
   def getAll(): Seq[EngineInstance] = {
     try {
       val builder = client.prepareSearch(index).setTypes(estype)

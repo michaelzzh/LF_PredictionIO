@@ -38,7 +38,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       description text,
       files text not null,
       engineFactory text not null,
-      port int not null)""".execute().apply()
+      port int not null,
+      trainingStatus text not null)""".execute().apply()
   }
 
   def insert(m: EngineManifest): Unit = DB localTx { implicit session =>
@@ -50,7 +51,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       ${m.description},
       ${m.files.mkString(",")},
       ${m.engineFactory},
-      ${m.port})""".update().apply()
+      ${m.port},
+      ${m.trainingStatus})""".update().apply()
   }
 
   def get(id: String, version: String): Option[EngineManifest] = DB localTx { implicit session =>
@@ -62,7 +64,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       description,
       files,
       engineFactory,
-      port
+      port,
+      trainingStatus
     FROM $tableName WHERE id = $id AND version = $version""".
       map(resultToEngineManifest).single().apply()
   }
@@ -76,7 +79,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       description,
       files,
       engineFactory,
-      port
+      port,
+      trainingStatus
     FROM $tableName""".map(resultToEngineManifest).list().apply()
   }
 
@@ -89,7 +93,8 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
         description = ${m.description},
         files = ${m.files.mkString(",")},
         engineFactory = ${m.engineFactory},
-        port = ${m.port}
+        port = ${m.port},
+        trainingStatus = ${m.trainingStatus}
       where id = ${m.id} and version = ${m.version}""".update().apply()
     }
     if (r == 0) {
@@ -115,6 +120,7 @@ class JDBCEngineManifests(client: String, config: StorageClientConfig, prefix: S
       description = rs.stringOpt("description"),
       files = rs.string("files").split(","),
       engineFactory = rs.string("engineFactory"),
-      port = rs.int("port"))
+      port = rs.int("port"),
+      trainingStatus = rs.string("trainingStatus"))
   }
 }

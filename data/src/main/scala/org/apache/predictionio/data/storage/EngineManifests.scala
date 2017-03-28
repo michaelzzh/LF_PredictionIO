@@ -41,7 +41,8 @@ case class EngineManifest(
   description: Option[String],
   files: Seq[String],
   engineFactory: String,
-  port: Int)
+  port: Int,
+  trainingStatus: String)
 
 /** :: DeveloperApi ::
   * Base trait of the [[EngineManifest]] data access object
@@ -83,7 +84,8 @@ class EngineManifestSerializer
         description = None,
         files = Nil,
         engineFactory = "",
-        port = -1)
+        port = -1,
+        trainingStatus = "NONE")
       fields.foldLeft(seed) { case (enginemanifest, field) =>
         field match {
           case JField("id", JString(id)) => enginemanifest.copy(id = id)
@@ -103,6 +105,8 @@ class EngineManifestSerializer
             enginemanifest.copy(engineFactory = engineFactory)
           case JField("port", JInt(port)) =>
             enginemanifest.copy(port = port.intValue())
+          case JField("trainingStatus", JString(status)) =>
+            enginemanifest.copy(trainingStatus = status)
           case _ => enginemanifest
         }
       }
@@ -120,6 +124,7 @@ class EngineManifestSerializer
           JArray(enginemanifest.files.map(x => JString(x)).toList)) ::
         JField("engineFactory", JString(enginemanifest.engineFactory)) ::
         JField("port", JInt(enginemanifest.port)) ::
+        JField("trainingStatus", JString(enginemanifest.trainingStatus)) ::
         Nil)
   }
 ))

@@ -93,10 +93,39 @@ class JDBCEngineInstances(client: String, config: StorageClientConfig, prefix: S
       single().apply()
   }
 
+  def getAllEngineIds(engineId: String): Seq[EngineInstance] = DB localTx { implicit session =>
+    sql"""
+    SELECT
+      id,
+      status,
+      startTime,
+      endTime,
+      engineId,
+      engineVersion,
+      engineVariant,
+      engineFactory,
+      batch,
+      env,
+      sparkConf,
+      datasourceParams,
+      preparatorParams,
+      algorithmsParams,
+      servingParams
+    FROM $tableName
+    WHERE
+      engineId = $engineId
+    ORDER BY startTime DESC""".
+      map(resultToEngineInstance).list().apply()
+  }
+
+  def getWithEngineId(engineId: String): Option[EngineInstance] = DB localTx { implicit session =>
+    getAllEngineIds(engineId).headOption
+  }
+
   def getBaseEngines(): Seq[String] = DB localTx { implicit session =>
     sql"""
     SELECT
-      engineId,
+      engineId
     FROM $tableName WHERE engineVariant = 'base'""".map(resultToEngineId).list().apply().distinct
   }
 

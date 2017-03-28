@@ -73,11 +73,17 @@ trait EngineInstances {
   /** Get an [[EngineInstance]] by ID */
   def get(id: String): Option[EngineInstance]
 
+  /** Get an [[EngineInstance]] by engineId*/
+  def getWithEngineId(engineId: String): Option[EngineInstance]
+
   /** Get all [[EngineInstance]]s */
   def getAll(): Seq[EngineInstance]
   /** Get an instance that has started training the latest and has trained to
     * completion
     */
+  def getBaseEngines(): Seq[String]
+
+
   def getLatestCompleted(
       engineId: String,
       engineVersion: String,

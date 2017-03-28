@@ -912,7 +912,8 @@ object Console extends Logging {
       description = Some(manifestManualgenTag),
       files = Seq(),
       engineFactory = "",
-      port = ca.register.deployPort)
+      port = ca.register.deployPort,
+      trainingStatus = "NONE")
     RegisterEngine.registerEngineWithManifest(manifest, jarFiles)
     info("Your engine is ready for training.")
     0
@@ -1295,7 +1296,8 @@ object Console extends Logging {
       description = Some(manifestAutogenTag),
       files = Seq(),
       engineFactory = "",
-      port = -1)
+      port = -1,
+      trainingStatus = "NONE")
     try {
       FileUtils.writeStringToFile(json, write(em), "ISO-8859-1")
     } catch {
@@ -1320,7 +1322,8 @@ object Console extends Logging {
       description = Some(manifestManualgenTag),
       files = Seq(),
       engineFactory = "",
-      port = -1)
+      port = -1,
+      trainingStatus = "NONE")
     try {
       FileUtils.writeStringToFile(json, write(em), "ISO-8859-1")
     } catch {

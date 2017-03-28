@@ -38,10 +38,13 @@ import org.apache.predictionio.data.storage.LEvents
 import org.apache.predictionio.data.storage.Storage
 import org.apache.predictionio.data.storage.EngineData
 import org.apache.predictionio.data.storage.QueryData
+import org.apache.predictionio.data.storage.EngineManifest
+import org.apache.predictionio.data.storage.EngineInstance
 import org.json4s.DefaultFormats
 import org.json4s.Formats
 import org.json4s.JObject
 import org.json4s.native.JsonMethods.parse
+import org.json4s.native.Serialization.write
 import spray.can.Http
 import spray.http.FormData
 import spray.http.MediaTypes
@@ -152,9 +155,10 @@ class  EventServiceActor(
   }
 
   def startUpBaseEngines(): Unit = {
-    val allEngines = Storage.getMetaDataEngineInstances.getAll
+    //val allEngines = Storage.getMetaDataEngineInstances.getAll
     val allManifests = Storage.getMetaDataEngineManifests
-    val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
+    //val baseEngines = allEngines.filter(_.engineVariant == "base").map(x => x.engineId).distinct
+    val baseEngines = Storage.getMetaDataEngineInstances.getBaseEngines()
     for(engine <- baseEngines){
         allManifests.get(engine, engine) map {manifest =>
           val port = manifest.port
@@ -194,6 +198,13 @@ class  EventServiceActor(
     s"engine ${engineId} data deleted"
   }
   def trainEngine(engineId: String, baseEngine: String) = {
+    val manifests = Storage.getMetaDataEngineManifests
+    manifests.get(engineId, engineId) map {manifest => 
+        val newManifest = manifest.copy(trainingStatus = "INIT")
+        manifests.update(newManifest)
+      } getOrElse {
+        error(s"No engineManifest can be found for $engineId")
+      }
     val training: Future[String] = Future {
       val stream = Process(Seq(
         "pio", 
@@ -209,12 +220,20 @@ class  EventServiceActor(
     }
 
     training onComplete {
+      case Success(_) => 
       case Failure(t) => println("An error has occured at train: " + t.getMessage)
     }
   }
 
-  def getTrainStatus(engineId: String) = {
-
+  def getTrainStatus(engineId: String):String = {
+    val manifests = Storage.getMetaDataEngineManifests
+    var status = ""
+    manifests.get(engineId, engineId) map {em => 
+      status = em.trainingStatus      
+    } getOrElse {
+      error(s"No engine manifest found for $engineId")
+    }
+    status
   }
 
   private val FailedAuth = Left(
@@ -503,6 +522,24 @@ class  EventServiceActor(
                 val baseEngine = data.baseEngine
                 trainEngine(engineId, baseEngine)
                 s"training started for ${engineId}"
+              }
+            }
+          }
+        }
+      }
+    }~
+    path("engine" / "status"){
+      import Json4sProtocol._
+      post{
+        handleExceptions(Common.exceptionHandler) {
+          handleRejections(rejectionHandler) {
+            entity(as[EngineData]) {data =>
+              System.out.println("received status request")
+              val engineId = data.engineId
+              val status = getTrainStatus(engineId)
+              val formatedData = Map("status" -> status)
+              respondWithMediaType(MediaTypes.`application/json`) {
+                complete(write(formatedData))
               }
             }
           }

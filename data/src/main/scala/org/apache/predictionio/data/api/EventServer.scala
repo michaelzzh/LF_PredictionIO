@@ -177,15 +177,15 @@ class  EventServiceActor(
     } 
   }
 
-  def registerEngine(engineId: String, accessKey: String, baseEngine: String):String = {
-    Process(Seq("pio", "register", s"--engine-id ${engineId}", s"--base-engine-url ${pio_root}/engines/${baseEngine}"),
-      new File(s"${pio_root}/engines/${baseEngine}")).!
-
+  def registerEngine(baseEngine: String):String = {
+    val id = java.util.UUID.randomUUID().toString
     Future{
-      Process(Seq("pio", "app", "new", engineId, "--access-key", accessKey)).!
+      Process(Seq("pio", "register", s"--engine-id ${id}", s"--base-engine-url ${pio_root}/engines/${baseEngine}", s"--base-engine-id $baseEngine"),
+      new File(s"${pio_root}/engines/${baseEngine}")).!
+      Process(Seq("pio", "app", "new", id, "--access-key", id)).!
     }
 
-    s"user ${engineId} registered"
+    id
   }
 
   def deleteEngine(engineId: String):String = {
@@ -501,10 +501,11 @@ class  EventServiceActor(
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
             entity(as[EngineData]) {data =>
-              complete {
-                val engineId = data.engineId
-                val baseEngine = data.baseEngine
-                registerEngine(engineId, engineId, baseEngine)
+              val baseEngine = data.baseEngine
+              val engineId = registerEngine(baseEngine)
+              val formattedData = Map("engineId" -> engineId)
+              respondWithMediaType(MediaTypes.`application/json`) {
+                complete(write(formattedData))
               }
             }
           }

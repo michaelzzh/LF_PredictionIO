@@ -340,7 +340,6 @@ object Storage extends Logging {
     info("Verifying Meta Data Backend (Source: " +
       s"${repositoriesToDataObjectMeta(MetaDataRepository).sourceName})...")
     getMetaDataEngineManifests()
-    getMetaDataClientManifests()
     getMetaDataEngineInstances()
     getMetaDataEvaluationInstances()
     getMetaDataApps()
@@ -385,9 +384,6 @@ object Storage extends Logging {
 
   private[predictionio] def getModelDataModels(): Models =
     getDataObjectFromRepo[Models](ModelDataRepository)
-
-  private[predictionio] def getMetaDataClientManifests(): ClientManifests =
-    getDataObjectFromRepo[ClientManifests](MetaDataRepository)
 
   private[predictionio] def getHistoryDataQueryHistories(): QueryHistories =
     getDataObjectFromRepo[QueryHistories](HistoryDataRepository)

@@ -29,7 +29,6 @@ import org.apache.predictionio.core.BaseServing
 import org.apache.predictionio.core.Doer
 import org.apache.predictionio.data.storage.EngineInstance
 import org.apache.predictionio.data.storage.EngineManifest
-import org.apache.predictionio.data.storage.ClientManifest
 import org.apache.predictionio.data.storage.QueryHistory
 import org.apache.predictionio.data.storage.QueryGroupHistory
 import org.apache.predictionio.data.storage.Storage
@@ -429,6 +428,138 @@ class EngineServerActor[Q, P](
     writer.toString
   }
 
+  def runQuery(queries: List[QueryEntry], engineId: String): ResultData = {
+    val jsonExtractorOption = args.jsonExtractor
+
+    val modeldata = Storage.getModelDataModels
+    val engineInstances = Storage.getMetaDataEngineInstances
+    val queryHistories = Storage.getHistoryDataQueryHistories
+    val queryGroupHistories = Storage.getHistoryDataQueryGroupHistories
+    val queryStartTime = DateTime.now
+
+    val engineInstance = engineInstances.getLatestCompleted(engineId, engineId, "default") getOrElse {error(
+      s"No valid engine instance found for engine ${engineId} "
+    )}
+    val engineInstanceId = engineInstance.id
+
+    val engineParams = engine.engineInstanceToEngineParams(engineInstance, args.jsonExtractor)
+
+    val algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
+      Doer(engine.algorithmClassMap(n), p)
+    }
+
+    val servingParamsWithName = engineParams.servingParams
+
+    val serving = Doer(engine.servingClassMap(servingParamsWithName._1),
+      servingParamsWithName._2)
+
+    val modelsFromEngineInstance = kryo.invert(modeldata.get(engineInstanceId).get.models).get.asInstanceOf[Seq[Any]]
+    val models = engine.prepareDeploy(
+      sparkContext,
+      engineParams,
+      engineInstanceId,
+      modelsFromEngineInstance,
+      params = WorkflowParams()
+    )
+
+    //val newId = java.util.UUID.randomUUID().toString
+    var groupHistory = QueryGroupHistory(groupId = "",
+                                        engineId = engineId,
+                                        status = "INIT",
+                                        progress = 0.0)
+    val newId = queryGroupHistories.insert(groupHistory)
+    val resultData = ResultData(groupId = newId,
+                            status = groupHistory.status,
+                            progress = groupHistory.progress)
+
+    Future{
+      var queriesDone = 0.0
+      val querySize = queries.size.toDouble
+
+      var lastRecordedTime = DateTime.now
+      for(singleQuery <- queries){
+        val queryString = singleQuery.queryString
+
+        val singleServingStartTime = DateTime.now
+
+        val queryHistory = QueryHistory(id = "",
+                                        groupId = newId,
+                                        status = "INIT",
+                                        query = queryString,
+                                        result = "")
+        val queryId = queryHistories.insert(queryHistory)
+
+        // Extract Query from Json
+        val query = JsonExtractor.extract(
+          jsonExtractorOption,
+          queryString,
+          algorithms.head.queryClass,
+          algorithms.head.querySerializer,
+          algorithms.head.gsonTypeAdapterFactories
+        )
+        val queryJValue = JsonExtractor.toJValue(
+          jsonExtractorOption,
+          query,
+          algorithms.head.querySerializer,
+          algorithms.head.gsonTypeAdapterFactories)
+
+        // Deploy logic. First call Serving.supplement, then Algo.predict,
+        // finally Serving.serve.
+        val supplementedQuery = serving.supplementBase(query)
+        // TODO: Parallelize the following.
+        val predictions = algorithms.zipWithIndex.map { case (a, ai) =>
+          a.predictBase(models(ai), supplementedQuery)
+        }
+        // Notice that it is by design to call Serving.serve with the
+        // *original* query.
+        val prediction = serving.serveBase(query, predictions)
+        val predictionJValue = JsonExtractor.toJValue(
+          jsonExtractorOption,
+          prediction,
+          algorithms.head.querySerializer,
+          algorithms.head.gsonTypeAdapterFactories)
+
+        val result = predictionJValue
+
+        val pluginResult =
+          pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>
+            p.process(engineInstance, queryJValue, r, pluginContext)
+          }
+
+        val newHist = queryHistory.copy(id = queryId,
+                        status = "COMPLETED",
+                        result = compact(render(pluginResult)))
+
+        queryHistories.update(newHist)
+
+        val resultEntry = ResultEntry(queryId = queryId,
+                                    resultString = compact(render(pluginResult)))
+
+        queriesDone += 1.0
+
+        // Bookkeeping
+        val servingEndTime = DateTime.now
+
+        if ((servingEndTime.getMillis - lastRecordedTime.getMillis) >= 500) {
+          lastRecordedTime = servingEndTime
+          var queryProgress = queriesDone / querySize
+          groupHistory = groupHistory.copy(groupId = newId, progress = queryProgress)
+          queryGroupHistories.update(groupHistory)                      
+        }
+      }
+
+      groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0)
+      queryGroupHistories.update(groupHistory)
+                
+      val queryEndTime = DateTime.now
+      val totalRequestTime =
+        (queryEndTime.getMillis - queryStartTime.getMillis) / 1000.0
+      val average = totalRequestTime * 1000 / queries.size
+      System.out.println(s"total serving time: ${totalRequestTime} seconds, average query time: ${average} milliseconds, items in this batch: ${queries.size}")
+    }
+    resultData
+  }
+
   val myRoute =
     path("queries.json") {
       import ServerJson4sSupport._
@@ -436,8 +567,7 @@ class EngineServerActor[Q, P](
         handleExceptions(Common.exceptionHandler) {
          handleRejections(Common.rejectionHandler) {
           entity(as[QueryData]) { qd =>
-            val jsonExtractorOption = args.jsonExtractor
-            val requestStartTime = DateTime.now
+            
           	val engineId = qd.engineId
             val queries = qd.properties
             val queryGroupId = qd.groupId
@@ -464,141 +594,7 @@ class EngineServerActor[Q, P](
                 }
                 
               } getOrElse {
-
-
-                var engineInstanceId = ""
-
-                val modeldata = Storage.getModelDataModels
-                val engineInstances = Storage.getMetaDataEngineInstances
-                val engineInstance = engineInstances.getLatestCompleted(engineId, engineId, "default") getOrElse {error(
-                  s"No valid engine instance found for engine ${engineId} "
-                )}
-                engineInstanceId = engineInstance.id
-
-                val engineParams = engine.engineInstanceToEngineParams(engineInstance, args.jsonExtractor)
-
-                val algorithms = engineParams.algorithmParamsList.map { case (n, p) =>
-                  Doer(engine.algorithmClassMap(n), p)
-                }
-
-                val servingParamsWithName = engineParams.servingParams
-
-                val serving = Doer(engine.servingClassMap(servingParamsWithName._1),
-                servingParamsWithName._2)
-
-                val modelsFromEngineInstance = kryo.invert(modeldata.get(engineInstance.id).get.models).get.asInstanceOf[Seq[Any]]
-                val models = engine.prepareDeploy(
-                  sparkContext,
-                  engineParams,
-                  engineInstanceId,
-                  modelsFromEngineInstance,
-                  params = WorkflowParams()
-                )
-
-                //val newId = java.util.UUID.randomUUID().toString
-                var groupHistory = QueryGroupHistory(groupId = "",
-                                                      engineId = engineId,
-                                                      status = "INIT",
-                                                      progress = 0.0)
-                val newId = queryGroupHistories.insert(groupHistory)
-                resultData = ResultData(groupId = newId,
-                                          status = groupHistory.status,
-                                          progress = groupHistory.progress)
-
-                Future{
-                  var queriesDone = 0.0
-                  val querySize = queries.size.toDouble
-                  var responseBuffer = ListBuffer[ResultEntry]()
-
-                  var lastRecordedTime = DateTime.now
-                  for(singleQuery <- queries){
-                    val queryString = singleQuery.queryString
-
-                    val singleServingStartTime = DateTime.now
-
-                    val queryHistory = QueryHistory(id = "",
-                                                groupId = newId,
-                                                status = "INIT",
-                                                query = queryString,
-                                                result = "")
-                    val queryId = queryHistories.insert(queryHistory)
-
-                    // Extract Query from Json
-                    val query = JsonExtractor.extract(
-                      jsonExtractorOption,
-                      queryString,
-                      algorithms.head.queryClass,
-                      algorithms.head.querySerializer,
-                      algorithms.head.gsonTypeAdapterFactories
-                    )
-                    val queryJValue = JsonExtractor.toJValue(
-                      jsonExtractorOption,
-                      query,
-                      algorithms.head.querySerializer,
-                      algorithms.head.gsonTypeAdapterFactories)
-
-                    // Deploy logic. First call Serving.supplement, then Algo.predict,
-                    // finally Serving.serve.
-                    val supplementedQuery = serving.supplementBase(query)
-                    // TODO: Parallelize the following.
-                    val predictions = algorithms.zipWithIndex.map { case (a, ai) =>
-                      a.predictBase(models(ai), supplementedQuery)
-                    }
-                    // Notice that it is by design to call Serving.serve with the
-                    // *original* query.
-                    val prediction = serving.serveBase(query, predictions)
-                    val predictionJValue = JsonExtractor.toJValue(
-                      jsonExtractorOption,
-                      prediction,
-                      algorithms.head.querySerializer,
-                      algorithms.head.gsonTypeAdapterFactories)
-
-                    val result = predictionJValue
-
-                    val pluginResult =
-                      pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>
-                        p.process(engineInstance, queryJValue, r, pluginContext)
-                      }
-
-                    val newHist = queryHistory.copy(id = queryId,
-                                    status = "COMPLETED",
-                                    result = compact(render(pluginResult)))
-
-                    queryHistories.update(newHist)
-
-                    val resultEntry = ResultEntry(queryId = queryId,
-                                                resultString = compact(render(pluginResult)))
-
-                    responseBuffer += resultEntry
-
-                    queriesDone += 1.0
-
-                    // Bookkeeping
-                    val servingEndTime = DateTime.now
-                    // lastServingSec =
-                    //   (servingEndTime.getMillis - singleServingStartTime.getMillis) * 1.0
-                    // avgServingSec =
-                    //   ((avgServingSec * requestCount) + lastServingSec) /
-                    //   (requestCount + 1)
-                    // requestCount += 1
-
-                    if ((servingEndTime.getMillis - lastRecordedTime.getMillis) >= 500) {
-                      lastRecordedTime = servingEndTime
-                      var queryProgress = queriesDone / querySize
-                      groupHistory = groupHistory.copy(groupId = newId, progress = queryProgress)
-                      queryGroupHistories.update(groupHistory)                      
-                    }
-                  }
-                  groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0)
-                  queryGroupHistories.update(groupHistory)
-                  responseList = responseBuffer.toList
-                
-                  val requestEndTime = DateTime.now
-                  val totalRequestTime =
-                    (requestEndTime.getMillis - requestStartTime.getMillis) / 1000.0
-                  val average = totalRequestTime * 1000 / queries.size
-                  System.out.println(s"total serving time: ${totalRequestTime} seconds, average query time: ${average} milliseconds, items in this batch: ${queries.size}")
-                }
+                resultData = runQuery(queries, engineId)
               }
               val formatedData = Map(
                 "groupId" -> resultData.groupId,

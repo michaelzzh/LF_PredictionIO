@@ -28,7 +28,6 @@ import org.apache.predictionio.data.api.EventServer
 import org.apache.predictionio.data.api.EventServerConfig
 import org.apache.predictionio.data.storage
 import org.apache.predictionio.data.storage.EngineManifest
-import org.apache.predictionio.data.storage.ClientManifest
 import org.apache.predictionio.data.storage.EngineManifestSerializer
 import org.apache.predictionio.data.storage.hbase.upgrade.Upgrade_0_8_3
 import org.apache.predictionio.tools.RegisterEngine
@@ -62,7 +61,6 @@ import scopt.Read
 import scopt._
 
 case class ConsoleArgs(
-  client: ClientArgs = ClientArgs(),
   common: CommonArgs = CommonArgs(),
   build: BuildArgs = BuildArgs(),
   register: RegisterArgs = RegisterArgs(),
@@ -140,11 +138,6 @@ case class UpgradeArgs(
   to: String = "0.0.0",
   oldAppId: Int = 0,
   newAppId: Int = 0
-)
-
-case class ClientArgs(
-  id: String = "",
-  url: String = ""
 )
 
 case class RegisterArgs(
@@ -242,19 +235,6 @@ object Console extends Logging {
           },
           opt[Unit]("generate-pio-sbt") action { (x, c) =>
             c.copy(build = c.build.copy(forceGeneratePIOSbt = true))
-          }
-        )
-      note("")
-      cmd("add-client").
-        text("add a client manifest").
-        action { (x, c) =>
-          c.copy(commands = c.commands :+"add-client")
-        } children(
-          opt[String]("id") action { (x, c) =>
-            c.copy(client = c.client.copy(id = x))
-          },
-          opt[String]("url") action { (x, c) =>
-            c.copy(client = c.client.copy(url = x))
           }
         )
       note("")
@@ -772,8 +752,6 @@ object Console extends Logging {
         case Seq("build") =>
           regenerateManifestJson(ca.common.manifestJson)
           build(ca)
-        case Seq("add-client") =>
-          addClient(ca.client.id, ca.client.url)
         case Seq("register") =>
           val eId = ca.common.engineId
           registerEngineWithArgs(ca, eId)
@@ -886,13 +864,6 @@ object Console extends Logging {
     "dashboard" -> txt.dashboard().toString)
 
   def version(ca: ConsoleArgs): Unit = println(BuildInfo.version)
-
-  def addClient(clientId: String, url: String): Int = {
-    val clientInstances = storage.Storage.getMetaDataClientManifests
-    val client = ClientManifest(id = "", clientId = clientId, url = url)
-    clientInstances.insert(client)
-    1
-  }
 
   def registerEngineWithArgs(ca: ConsoleArgs, engineId: String): Int = {
     if (engineId == ""){

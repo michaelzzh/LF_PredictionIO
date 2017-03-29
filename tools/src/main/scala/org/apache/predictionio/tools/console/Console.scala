@@ -913,7 +913,8 @@ object Console extends Logging {
       files = Seq(),
       engineFactory = "",
       port = ca.register.deployPort,
-      trainingStatus = "NONE")
+      trainingStatus = "NONE",
+      baseEngine = ca.common.baseEngineId)
     RegisterEngine.registerEngineWithManifest(manifest, jarFiles)
     info("Your engine is ready for training.")
     0
@@ -1297,33 +1298,8 @@ object Console extends Logging {
       files = Seq(),
       engineFactory = "",
       port = -1,
-      trainingStatus = "NONE")
-    try {
-      FileUtils.writeStringToFile(json, write(em), "ISO-8859-1")
-    } catch {
-      case e: java.io.IOException =>
-        error(s"Cannot generate ${json} automatically (${e.getMessage}). " +
-          "Aborting.")
-        sys.exit(1)
-    }
-  }
-
-  def generateManifestJsonWithEngineId(json: File, engineId: String): Unit = {
-    if(engineId == ""){
-      error(s"need to provide engineId")
-    }
-    val cwd = sys.props("user.dir")
-    implicit val formats = Utils.json4sDefaultFormats +
-      new EngineManifestSerializer
-    val em = EngineManifest(
-      id = engineId,
-      version = engineId,
-      name = new File(cwd).getName,
-      description = Some(manifestManualgenTag),
-      files = Seq(),
-      engineFactory = "",
-      port = -1,
-      trainingStatus = "NONE")
+      trainingStatus = "NONE",
+      baseEngine = "")
     try {
       FileUtils.writeStringToFile(json, write(em), "ISO-8859-1")
     } catch {

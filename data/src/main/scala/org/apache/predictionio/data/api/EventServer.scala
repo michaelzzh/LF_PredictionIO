@@ -197,15 +197,13 @@ class  EventServiceActor(
     Process(Seq("pio", "app", "data-delete", engineId, "-f")).!
     s"engine ${engineId} data deleted"
   }
-  def trainEngine(engineId: String, baseEngine: String) = {
+  def trainEngine(engineId: String) = {
     val manifests = Storage.getMetaDataEngineManifests
-    manifests.get(engineId, engineId) map {manifest => 
-        val newManifest = manifest.copy(trainingStatus = "INIT")
-        manifests.update(newManifest)
-      } getOrElse {
-        error(s"No engineManifest can be found for $engineId")
-      }
-    val training: Future[String] = Future {
+    manifests.get(engineId, engineId) map {manifest =>
+      val baseEngine = manifest.baseEngine 
+      val newManifest = manifest.copy(trainingStatus = "INIT")
+      manifests.update(newManifest)
+      val training: Future[String] = Future {
       val stream = Process(Seq(
         "pio", 
         "train", 
@@ -217,11 +215,14 @@ class  EventServiceActor(
       
       stream foreach println
       engineId
-    }
+      }
 
-    training onComplete {
-      case Success(_) => 
-      case Failure(t) => println("An error has occured at train: " + t.getMessage)
+      training onComplete {
+        case Success(_) => 
+        case Failure(t) => println("An error has occured at train: " + t.getMessage)
+      }
+    } getOrElse {
+      error(s"No engineManifest can be found for $engineId")
     }
   }
 
@@ -520,8 +521,8 @@ class  EventServiceActor(
             entity(as[EngineData]) {data =>
               complete {
                 val engineId = data.engineId
-                val baseEngine = data.baseEngine
-                trainEngine(engineId, baseEngine)
+                trainEngine(engineId)
+                s"training started for engine $engineId"
               }
             }
           }

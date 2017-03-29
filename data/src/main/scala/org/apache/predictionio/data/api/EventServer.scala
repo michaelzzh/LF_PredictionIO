@@ -521,7 +521,6 @@ class  EventServiceActor(
                 val engineId = data.engineId
                 val baseEngine = data.baseEngine
                 trainEngine(engineId, baseEngine)
-                s"training started for ${engineId}"
               }
             }
           }
@@ -534,7 +533,6 @@ class  EventServiceActor(
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
             entity(as[EngineData]) {data =>
-              System.out.println("received status request")
               val engineId = data.engineId
               val status = getTrainStatus(engineId)
               val formatedData = Map("status" -> status)

@@ -15,7 +15,7 @@ case class QueryEntry(
 
 case class ResultData(
 	val groupId: String = "",
-	val status: String = "EMPTY",
+	val status: String = "NONE",
 	val progress: Double = 0.0,
 	val predictions: List[ResultEntry] = List()
 )

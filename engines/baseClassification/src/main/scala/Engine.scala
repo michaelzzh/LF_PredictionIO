@@ -8,7 +8,8 @@ class Query(
 ) extends Serializable
 
 class PredictedResult(
-  val label: Double
+  val label: Double,
+  val confidence: Double
 ) extends Serializable
 
 class ActualResult(

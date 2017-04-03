@@ -80,11 +80,6 @@ PIO_STORAGE_SOURCES_PGSQL_URL=jdbc:postgresql://v-dev-ubudsk-2/pio
 PIO_STORAGE_SOURCES_PGSQL_USERNAME=pio
 PIO_STORAGE_SOURCES_PGSQL_PASSWORD=pio
 
-#PIO_STORAGE_SOURCES_PGSQL_TYPE=jdbc
-#PIO_STORAGE_SOURCES_PGSQL_URL="jdbc:postgresql://infrastructure.database.server.lfcinternal:5432/predictionIO_POC_kanak?ssl=true&sslfactory=org.postgresql.ssl.NonValidatingFacory"
-#PIO_STORAGE_SOURCES_PGSQL_USERNAME="acs_services"
-#PIO_STORAGE_SOURCES_PGSQL_PASSWORD="^G%8,4<VpMv+jR1ConVd"
-
 # MySQL Example
 # PIO_STORAGE_SOURCES_MYSQL_TYPE=jdbc
 # PIO_STORAGE_SOURCES_MYSQL_URL=jdbc:mysql://localhost/pio

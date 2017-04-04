@@ -194,8 +194,9 @@ class  EventServiceActor(
 
   def deleteEngineData(engineId: String):String = {
     Process(Seq("pio", "app", "data-delete", engineId, "-f")).!
-    s"engine ${engineId} data deleted"
+    s"event data for ${engineId} cleared"
   }
+
   def trainEngine(engineId: String) = {
     val manifests = Storage.getMetaDataEngineManifests
     manifests.get(engineId, engineId) map {manifest =>
@@ -509,6 +510,21 @@ class  EventServiceActor(
         }
       }  
     }~
+    path("engine" / "data"){
+      import Json4sProtocol._
+      delete {
+        handleExceptions(Common.exceptionHandler) {
+          handleRejections(rejectionHandler) {
+            entity(as[EngineData]) {data =>
+              complete {
+                val engineId = data.engineId
+                deleteEngineData(engineId)
+              }
+            }
+          }
+        }
+      }
+    }
     path("engine" / "train"){
       import Json4sProtocol._
       post{

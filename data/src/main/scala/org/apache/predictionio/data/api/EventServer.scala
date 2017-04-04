@@ -184,7 +184,6 @@ class  EventServiceActor(
       new File(s"${pio_root}/engines/${baseEngine}")).!
       Process(Seq("pio", "app", "new", id, "--access-key", id)).!
     }
-
     id
   }
 
@@ -481,21 +480,6 @@ class  EventServiceActor(
         }
       }
     } ~
-    path("engine") {
-      import Json4sProtocol._
-      delete {
-        handleExceptions(Common.exceptionHandler) {
-          handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              complete {
-                val engineId = data.engineId
-                deleteEngine(engineId)
-              }
-            }
-          }
-        }
-      }
-    }~
     path("engine" / "register") {
       import Json4sProtocol._
       post{
@@ -507,6 +491,18 @@ class  EventServiceActor(
               val formattedData = Map("engineId" -> engineId)
               respondWithMediaType(MediaTypes.`application/json`) {
                 complete(write(formattedData))
+              }
+            }
+          }
+        }
+      }~
+      delete {
+        handleExceptions(Common.exceptionHandler) {
+          handleRejections(rejectionHandler) {
+            entity(as[EngineData]) {data =>
+              complete {
+                val engineId = data.engineId
+                deleteEngine(engineId)
               }
             }
           }

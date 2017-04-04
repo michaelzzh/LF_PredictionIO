@@ -254,12 +254,6 @@ object Console extends Logging {
           c.copy(commands = c.commands :+ "unregister")
         }
       note("")
-      cmd("deploy-base-engine").
-        text("deploy all base engines").
-        action { (_, c) =>
-          c.copy(commands = c.commands :+ "deploy-base-engine")
-        }
-      note("")
       cmd("train").
         text("Kick off a training using an engine. This will produce an\n" +
           "engine instance. This command will pass all pass-through\n" +
@@ -538,19 +532,6 @@ object Console extends Logging {
               } text("Name of the app to be shown.")
             ),
           note(""),
-          cmd("clean-delete").
-            text("delete all meta-data and models of an app").
-            action { (_, c) =>
-              c.copy(commands = c.commands :+ "clean-delete")
-            } children(
-              arg[String]("<name>") action { (x, c) =>
-                c.copy(app = c.app.copy(name = x))
-              } text("Name of the app to be deleted."),
-              opt[Unit]("force") abbr("f") action { (x, c) =>
-                c.copy(app = c.app.copy(force = true))
-              } text("Delete an app completely without prompting for confirmation")
-            ),
-          note(""),
           cmd("delete").
             text("Delete an app.").
             action { (_, c) =>
@@ -767,8 +748,6 @@ object Console extends Logging {
           train(ca)
         case Seq("deploy") =>
           deploy(ca)
-        case Seq("deploy-base-engine") =>
-          deployBaseEngine(ca)
         case Seq("undeploy") =>
           undeploy(ca)
         case Seq("dashboard") =>
@@ -796,9 +775,6 @@ object Console extends Logging {
           App.show(ca)
         case Seq("app", "delete") =>
           App.delete(ca)
-        case Seq("app", "clean-delete") =>
-          App.delete(ca)
-          //clearAllAppData(ca)
         case Seq("app", "data-delete") =>
           App.dataDelete(ca)
         case Seq("app", "channel-new") =>
@@ -920,22 +896,6 @@ object Console extends Logging {
       ca.common.engineId) { em =>
       RunWorkflow.newRunWorkflow(ca, em)
     }
-  }
-
-  def deployBaseEngine(ca: ConsoleArgs): Int = {
-    val pio_root = sys.env("PIO_ROOT")
-    val engine = ca.common.engineId
-    val allManifests = storage.Storage.getMetaDataEngineManifests
-    allManifests.get(engine, engine) map {manifest =>
-        val port = manifest.port
-        val args = ca.copy(deploy = ca.deploy.copy(port = port),
-                      common = ca.common.copy(variantJson = new File(s"${pio_root}/engines/${engine}/engine.json")))
-        System.out.println(s"Starting up base engine ${engine} at port ${port}")
-        deploy(args)
-      } getOrElse {
-        error(s"no engine masnifest found for ${engine}")
-      }
-    1
   }
 
   def deploy(ca: ConsoleArgs): Int = {

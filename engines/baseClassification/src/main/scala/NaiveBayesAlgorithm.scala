@@ -6,8 +6,9 @@ import org.apache.predictionio.controller.Params
 import org.apache.spark.mllib.classification.NaiveBayes
 import org.apache.spark.mllib.classification.NaiveBayesModel
 import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.SparkContext
-
+import scala.math._
 import grizzled.slf4j.Logger
 import scala.math._
 
@@ -20,6 +21,16 @@ class NaiveBayesAlgorithm(val ap: AlgorithmParams)
   extends P2LAlgorithm[PreparedData, NaiveBayesModel, Query, PredictedResult] {
 
   @transient lazy val logger = Logger[this.type]
+
+  private def innerProduct (x : Array[Double], y : Array[Double]) : Double = {
+    x.zip(y).map(e => e._1 * e._2).sum
+  }
+
+  val normalize = (u: Array[Double]) => {
+    val uSum = u.sum
+
+    u.map(e => e / uSum)
+  }
 
   def train(sc: SparkContext, data: PreparedData): NaiveBayesModel = {
     // MLLib NaiveBayes cannot handle empty training data.
@@ -42,20 +53,13 @@ class NaiveBayesAlgorithm(val ap: AlgorithmParams)
   }
 
   def predict(model: NaiveBayesModel, query: Query): PredictedResult = {
-    val scoreArray = model.pi.zip(model.theta)
-    //System.out.println("pi: " + model.pi.mkString(","))
-    val x = Vectors.dense(query.features)
-
-    val z = scoreArray
-      .map(e => innerProduct(e._2, x.toArray) + e._1)
-
-    val scores = normalize((0 until z.size).map(k => exp(z(k) - z.max)).toArray)
-    //System.out.println("theta times features:\n" + z.map(_.mkString(",")).mkString("\n"))
-    System.out.println("scores: " + scores.mkString(", "))
-    val label = model.predict(Vectors.dense(
-      query.features)
-    )
-    new PredictedResult(label = label, confidence = scores.max)
+    val probabilityArray: Array[(Double,Array[Double])] = model.pi.zip(model.theta)
+    val scoreArray: Array[Double] = probabilityArray
+      .map(e => innerProduct(e._2, query.features.toArray) + e._1)
+    
+    val x: Array[Double] = normalize((0 until scoreArray.size).map(k => exp(scoreArray(k) - scoreArray.max)).toArray)
+    val y: (Double, Double) = (model.labels zip x).maxBy(_._2)
+    new PredictedResult(y._1, y._2)
   }
 
 }

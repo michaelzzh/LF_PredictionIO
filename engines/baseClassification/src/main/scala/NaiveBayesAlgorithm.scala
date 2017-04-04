@@ -42,16 +42,6 @@ class NaiveBayesAlgorithm(val ap: AlgorithmParams)
     NaiveBayes.train(data.labeledPoints, ap.lambda)
   }
 
-  private def innerProduct (x : Array[Double], y : Array[Double]) : Double = {
-    x.zip(y).map(e => e._1 * e._2).sum
-  }
-
-  val normalize = (u: Array[Double]) => {
-    val uSum = u.sum
-
-    u.map(e => e / uSum)
-  }
-
   def predict(model: NaiveBayesModel, query: Query): PredictedResult = {
     val probabilityArray: Array[(Double,Array[Double])] = model.pi.zip(model.theta)
     val scoreArray: Array[Double] = probabilityArray

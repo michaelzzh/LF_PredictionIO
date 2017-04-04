@@ -524,7 +524,7 @@ class  EventServiceActor(
           }
         }
       }
-    }
+    }~
     path("engine" / "train"){
       import Json4sProtocol._
       post{

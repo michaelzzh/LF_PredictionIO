@@ -9,7 +9,7 @@ case class QueryData(
 )
 
 case class QueryEntry(
-	val queryId: String,
+	val queryId: Int,
 	val queryString: String
 )
 
@@ -21,6 +21,6 @@ case class ResultData(
 )
 
 case class ResultEntry(
-	val queryId: String,
+	val queryId: Int,
 	val resultString: String
 )

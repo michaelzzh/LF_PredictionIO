@@ -74,6 +74,8 @@ import org.apache.http.impl.client.DefaultHttpClient
 import java.util.ArrayList
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.client.entity.UrlEncodedFormEntity
+import java.security.SecureRandom
+import org.apache.commons.codec.binary.Base64
 
 class  EventServiceActor(
     val eventClient: LEvents,
@@ -112,6 +114,16 @@ class  EventServiceActor(
   private lazy val base64Decoder = new BASE64Decoder
 
   case class AuthData(appId: Int, channelId: Option[Int], events: Seq[String])
+
+  case class EngineAuthData(engineId: String = "", accessKey: String = "")
+
+  def authorizeAPI: RequestContext => Future[Authentication[EngineAuthData]] = {
+    ctx: RequestContext =>
+      val engineIdParamOpt = ctx.request.uri.query.get("engineId")
+      Future {
+        Right(EngineAuthData())
+      }
+  }
 
   /* with accessKey in query/header, return appId if succeed */
   def withAccessKey: RequestContext => Future[Authentication[AuthData]] = {
@@ -177,14 +189,22 @@ class  EventServiceActor(
     } 
   }
 
-  def registerEngine(baseEngine: String):String = {
+  def registerEngine(baseEngine: String):EngineAuthData = {
     val id = java.util.UUID.randomUUID().toString
+    val accessKey = generateAccessKey()
     Future{
       Process(Seq("pio", "register", s"--engine-id ${id}", s"--base-engine-url ${pio_root}/engines/${baseEngine}", s"--base-engine-id $baseEngine"),
       new File(s"${pio_root}/engines/${baseEngine}")).!
-      Process(Seq("pio", "app", "new", id, "--access-key", id)).!
+      Process(Seq("pio", "app", "new", id, "--access-key", accessKey)).!
     }
-    id
+    EngineAuthData(engineId = id, accessKey = accessKey)
+  }
+
+  def generateAccessKey():String = {
+    val sr = SecureRandom.getInstance("SHA1PRNG")
+    val srBytes = Array.fill(48)(0.toByte)
+    sr.nextBytes(srBytes)
+    Base64.encodeBase64URLSafeString(srBytes)
   }
 
   def deleteEngine(engineId: String):String = {
@@ -488,8 +508,9 @@ class  EventServiceActor(
           handleRejections(rejectionHandler) {
             entity(as[EngineData]) {data =>
               val baseEngine = data.baseEngine
-              val engineId = registerEngine(baseEngine)
-              val formattedData = Map("engineId" -> engineId)
+              val engineAuthData = registerEngine(baseEngine)
+              val formattedData = Map("engineId" -> engineAuthData.engineId,
+                                      "accessKey" -> engineAuthData.accessKey)
               respondWithMediaType(MediaTypes.`application/json`) {
                 complete(write(formattedData))
               }
@@ -500,10 +521,12 @@ class  EventServiceActor(
       delete {
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              complete {
-                val engineId = data.engineId
-                deleteEngine(engineId)
+            authenticate(withAccessKey) { authData =>
+              entity(as[EngineData]) {data =>
+                complete {
+                  val engineId = data.engineId
+                  deleteEngine(engineId)
+                }
               }
             }
           }
@@ -515,10 +538,12 @@ class  EventServiceActor(
       delete {
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              complete {
-                val engineId = data.engineId
-                deleteEngineData(engineId)
+            authenticate(withAccessKey) {authData =>
+              entity(as[EngineData]) {data =>
+                complete {
+                  val engineId = data.engineId
+                  deleteEngineData(engineId)
+                }
               }
             }
           }
@@ -530,11 +555,13 @@ class  EventServiceActor(
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              complete {
-                val engineId = data.engineId
-                trainEngine(engineId)
-                s"training started for engine $engineId"
+            authenticate(withAccessKey) { authData =>
+              entity(as[EngineData]) {data =>
+                complete {
+                  val engineId = data.engineId
+                  trainEngine(engineId)
+                  s"training started for engine $engineId"
+                }
               }
             }
           }
@@ -546,12 +573,14 @@ class  EventServiceActor(
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              val engineId = data.engineId
-              val status = getTrainStatus(engineId)
-              val formatedData = Map("status" -> status)
-              respondWithMediaType(MediaTypes.`application/json`) {
-                complete(write(formatedData))
+            authenticate(withAccessKey){ authData =>
+              entity(as[EngineData]) {data =>
+                val engineId = data.engineId
+                val status = getTrainStatus(engineId)
+                val formatedData = Map("status" -> status)
+                respondWithMediaType(MediaTypes.`application/json`) {
+                  complete(write(formatedData))
+                }
               }
             }
           }

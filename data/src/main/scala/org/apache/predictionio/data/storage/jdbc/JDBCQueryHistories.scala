@@ -15,6 +15,7 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
     sql"""
     create table if not exists $tableName (
       id varchar(100) not null primary key,
+      queryid int not null,
       groupid text not null,
       status text not null,
       query text not null,
@@ -25,7 +26,8 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
     val id = java.util.UUID.randomUUID().toString
     sql"""
     INSERT INTO $tableName VALUES(
-      ${id},
+      $id,
+      ${i.queryId},
       ${i.groupId},
       ${i.status},
       ${i.query},
@@ -33,21 +35,40 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
     id
   }
 
-  def get(queryId: String): Option[QueryHistory] = DB localTx { implicit session =>
+  def get(queryId: Int, groupId: String): Option[QueryHistory] = DB localTx { implicit session =>
     sql"""
     SELECT
       id,
+      queryid,
       groupid,
       status,
       query,
       result
-    FROM $tableName WHERE id = $queryId""".map(resultToQueryHistory).single().apply()
+    FROM $tableName 
+    WHERE 
+      queryid = $queryId AND 
+      groupid = $groupId""".map(resultToQueryHistory).single().apply()
+  }
+
+  def getWithId(id: String): Option[QueryHistory] = DB localTx { implicit session =>
+    sql"""
+    SELECT
+      id,
+      queryid,
+      groupid,
+      status,
+      query,
+      result
+    FROM $tableName
+    WHERE
+      id = $id""".map(resultToQueryHistory).single().apply()
   }
 
   def getGroup(groupId: String): List[QueryHistory] = DB localTx { implicit session =>
     sql"""
     SELECT
       id,
+      queryid,
       groupid,
       status,
       query,
@@ -55,27 +76,28 @@ class JDBCQueryHistories(client: String, config: StorageClientConfig, prefix: St
     FROM $tableName 
     WHERE 
       groupid = $groupId AND
-      status = 'COMPLETED'""".map(resultToQueryHistory).list().apply()
+      status = 'COMPLETED'
+    ORDER BY queryid ASC""".map(resultToQueryHistory).list().apply()
   }
 
   def update(i: QueryHistory): Unit = DB localTx { implicit session =>
     sql"""
     update $tableName set
-      groupid = ${i.groupId},
       status = ${i.status},
       query = ${i.query},
       result = ${i.result}
-    where id = ${i.id}""".update().apply()
+    where queryid = ${i.queryId} AND groupid = ${i.groupId}""".update().apply()
   }
 
-  def delete(id: String): Unit = DB localTx { implicit session =>
-    sql"DELETE FROM $tableName WHERE id = $id".update().apply()
+  def delete(queryId: Int, groupId: String): Unit = DB localTx { implicit session =>
+    sql"DELETE FROM $tableName WHERE queryid = $queryId AND groupid = $groupId".update().apply()
   }
 
   /** Convert JDBC results to [[ClientManfiest]] */
   def resultToQueryHistory(rs: WrappedResultSet): QueryHistory = {
     QueryHistory(
       id = rs.string("id"),
+      queryId = rs.int("queryid"),
       groupId = rs.string("groupid"),
       status = rs.string("status"),
       query = rs.string("query"),

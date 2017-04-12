@@ -477,17 +477,19 @@ class EngineServerActor[Q, P](
       val querySize = queries.size.toDouble
 
       var lastRecordedTime = DateTime.now
+      var queryId = 1
       for(singleQuery <- queries){
         val queryString = singleQuery.queryString
 
         val singleServingStartTime = DateTime.now
 
         val queryHistory = QueryHistory(id = "",
+                                        queryId = queryId,
                                         groupId = newId,
                                         status = "INIT",
                                         query = queryString,
                                         result = "")
-        val queryId = queryHistories.insert(queryHistory)
+        val queryHistoryId = queryHistories.insert(queryHistory)
 
         // Extract Query from Json
         val query = JsonExtractor.extract(
@@ -526,7 +528,8 @@ class EngineServerActor[Q, P](
             p.process(engineInstance, queryJValue, r, pluginContext)
           }
 
-        val newHist = queryHistory.copy(id = queryId,
+        val newHist = queryHistory.copy(
+                        id = queryHistoryId,
                         status = "COMPLETED",
                         result = compact(render(pluginResult)))
 
@@ -534,7 +537,7 @@ class EngineServerActor[Q, P](
 
         val resultEntry = ResultEntry(queryId = queryId,
                                     resultString = compact(render(pluginResult)))
-
+        queryId += 1
         queriesDone += 1.0
 
         // Bookkeeping
@@ -582,7 +585,7 @@ class EngineServerActor[Q, P](
 
               queryGroupHistories.get(queryGroupId, engineId) map { groupHistory => 
                 if(groupHistory.status == "COMPLETED"){
-                    responseList = queryHistories.getGroup(groupHistory.groupId).map(qh => ResultEntry(queryId = qh.id, resultString = qh.result))
+                    responseList = queryHistories.getGroup(groupHistory.groupId).map(qh => ResultEntry(queryId = qh.queryId, resultString = qh.result))
                     resultData = ResultData(groupId = queryGroupId,
                                             status = "COMPLETED",
                                             progress = 1.0,

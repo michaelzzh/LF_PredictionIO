@@ -106,6 +106,8 @@ class  EventServiceActor(
 
   var trainingQueue: Queue[EngineData] = Queue()
   var trainingLeft = 2;
+
+  val internalAccessKey = generateAccessKey()
   // we use the enclosing ActorContext's or ActorSystem's dispatcher for our
   // Futures
   implicit def executionContext: ExecutionContext = context.dispatcher
@@ -183,25 +185,32 @@ class  EventServiceActor(
                   }.getOrElse{
                     Right(AuthData(k.appid, None, k.events))
                   }
-                }.getOrElse(FailedAuth)
+                }.getOrElse{
+                      if(accessKeyParam == internalAccessKey){
+                          Right(AuthData(0, None, Seq[String]()))
+                      }else{
+                        FailedAuth
+                      }
+                }
               } else {
                 FailedAuth
               }
             }.getOrElse{
-              accessKeysClient.get(accessKeyParam).map { k =>
-                channelParamOpt.map { ch =>
-                  val channelMap =
-                    channelsClient.getByAppid(k.appid)
-                    .map(c => (c.name, c.id)).toMap
-                  if (channelMap.contains(ch)) {
-                    Right(AuthData(k.appid, Some(channelMap(ch)), k.events))
-                  } else {
-                    Left(ChannelRejection(s"Invalid channel '$ch'."))
-                  }
-                }.getOrElse{
-                  Right(AuthData(k.appid, None, k.events))
-                }
-              }.getOrElse(FailedAuth)
+              FailedAuth
+              // accessKeysClient.get(accessKeyParam).map { k =>
+              //   channelParamOpt.map { ch =>
+              //     val channelMap =
+              //       channelsClient.getByAppid(k.appid)
+              //       .map(c => (c.name, c.id)).toMap
+              //     if (channelMap.contains(ch)) {
+              //       Right(AuthData(k.appid, Some(channelMap(ch)), k.events))
+              //     } else {
+              //       Left(ChannelRejection(s"Invalid channel '$ch'."))
+              //     }
+              //   }.getOrElse{
+              //     Right(AuthData(k.appid, None, k.events))
+              //   }
+              // }.getOrElse(FailedAuth)
             }
           }.getOrElse{
             // with accessKey in header, return appId if succeed
@@ -235,7 +244,13 @@ class  EventServiceActor(
                 }.getOrElse{
                   Right(AuthData(k.appid, None, k.events))
                 }
-              }.getOrElse(FailedAuth)
+              }.getOrElse{
+                      if(accessKeyParamOpt == internalAccessKey){
+                          Right(AuthData(0, None, Seq[String]()))
+                      }else{
+                        FailedAuth
+                      }
+                }
             }.getOrElse{
               // with accessKey in header, return appId if succeed
               ctx.request.headers.find(_.name == "Authorization").map { authHeader =>
@@ -354,8 +369,15 @@ class  EventServiceActor(
       }
     }else{
       if(engineData.engineId != ""){
-        System.out.println(s"Training queued for ${engineData.engineId}")
-        trainingQueue.enqueue(engineData)
+        val manifests = Storage.getMetaDataEngineManifests
+          manifests.get(engineData.engineId, engineData.engineId) map {manifest =>
+            val baseEngine = manifest.baseEngine 
+            val newManifest = manifest.copy(trainingStatus = "INIT")
+            manifests.update(newManifest)
+            System.out.println(s"Training queued for ${engineData.engineId}")
+            trainingQueue.enqueue(engineData)
+        }
+        
       }      
     }
     
@@ -374,7 +396,7 @@ class  EventServiceActor(
     val f: Future[Int] = Future {
       scalaj.http.Http(
         s"http://localhost:7070/" +
-        s"engine/train?securityKey=$securityKey").postData(
+        s"engine/train?accessKey=${internalAccessKey}&&securityKey=$securityKey").postData(
           write(data)
         ).header(
           "content-type", "application/json"
@@ -693,7 +715,7 @@ class  EventServiceActor(
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            authenticate(withSecurityKeyOnly) { _ =>
+            authenticate(withAccessKey) { _ =>
               entity(as[EngineData]) {data =>
                 complete {
                   trainEngine(data)
@@ -710,7 +732,7 @@ class  EventServiceActor(
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            authenticate(withSecurityKeyOnly){ _ =>
+            authenticate(withAccessKey){ _ =>
               entity(as[EngineData]) {data =>
                 val engineId = data.engineId
                 val status = getTrainStatus(engineId)

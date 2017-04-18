@@ -27,6 +27,7 @@ import org.apache.predictionio.core.BuildInfo
 import org.apache.predictionio.data.api.EventServer
 import org.apache.predictionio.data.api.EventServerConfig
 import org.apache.predictionio.data.storage
+import org.apache.predictionio.data.storage.ServerConfig
 import org.apache.predictionio.data.storage.EngineManifest
 import org.apache.predictionio.data.storage.EngineManifestSerializer
 import org.apache.predictionio.data.storage.hbase.upgrade.Upgrade_0_8_3
@@ -56,6 +57,8 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import sys.process._
+import java.security.SecureRandom
+import org.apache.commons.codec.binary.Base64
 
 import scopt.Read
 import scopt._
@@ -237,6 +240,12 @@ object Console extends Logging {
             c.copy(build = c.build.copy(forceGeneratePIOSbt = true))
           }
         )
+      note("")
+      cmd("generate-security-key").
+        text("generate a security to be stored in the db").
+        action { (x, c) =>
+          c.copy(commands = c.commands :+"generate-security-key")
+        }
       note("")
       cmd("register").
         text("register an instance of the engine at the current directory").
@@ -733,6 +742,9 @@ object Console extends Logging {
         case Seq("build") =>
           regenerateManifestJson(ca.common.manifestJson)
           build(ca)
+        case Seq("generate-security-key") =>
+          generateSecuritykey()
+          0
         case Seq("register") =>
           val eId = ca.common.engineId
           registerEngineWithArgs(ca, eId)
@@ -883,6 +895,22 @@ object Console extends Logging {
     //   false)
     info("Your engine is built, still need to run pio register --engine-id{} --variant{} to make engine deployable.")
     0
+  }
+
+  def generateSecuritykey(): Unit = {
+    val key = getSecureString()
+    val serverConfigs = storage.Storage.getMetaDataServerConfigs
+    val svConfig = new ServerConfig(securityKey = key)
+    serverConfigs.insert(svConfig)
+    info("Created new security-key:")
+            info(s"  key: ${key}")
+  }
+
+  def getSecureString():String = {
+    val sr = SecureRandom.getInstance("SHA1PRNG")
+    val srBytes = Array.fill(48)(0.toByte)
+    sr.nextBytes(srBytes)
+    Base64.encodeBase64URLSafeString(srBytes)
   }
 
   def unregister(ca: ConsoleArgs): Unit = {

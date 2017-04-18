@@ -40,11 +40,14 @@ import org.apache.predictionio.data.storage.EngineData
 import org.apache.predictionio.data.storage.QueryData
 import org.apache.predictionio.data.storage.EngineManifest
 import org.apache.predictionio.data.storage.EngineInstance
+import org.apache.predictionio.data.storage.ServerConfig
 import org.json4s.DefaultFormats
 import org.json4s.Formats
 import org.json4s.JObject
 import org.json4s.native.JsonMethods.parse
 import org.json4s.native.Serialization.write
+import org.json4s._
+import org.json4s.native.JsonMethods._
 import spray.can.Http
 import spray.http.FormData
 import spray.http.MediaTypes
@@ -54,6 +57,7 @@ import spray.routing._
 import spray.routing.authentication.Authentication
 import spray.httpx.SprayJsonSupport
 import spray.http._
+import scalaj.http.HttpOptions
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -76,6 +80,7 @@ import org.apache.http.message.BasicNameValuePair
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import java.security.SecureRandom
 import org.apache.commons.codec.binary.Base64
+import scala.collection.mutable.Queue
 
 class  EventServiceActor(
     val eventClient: LEvents,
@@ -98,6 +103,9 @@ class  EventServiceActor(
   val MaxNumberOfEventsPerBatchRequest = 50
 
   val logger = Logging(context.system, this)
+
+  var trainingQueue: Queue[EngineData] = Queue()
+  var trainingLeft = 2;
   // we use the enclosing ActorContext's or ActorSystem's dispatcher for our
   // Futures
   implicit def executionContext: ExecutionContext = context.dispatcher
@@ -115,53 +123,137 @@ class  EventServiceActor(
 
   case class AuthData(appId: Int, channelId: Option[Int], events: Seq[String])
 
-  case class EngineAuthData(engineId: String = "", accessKey: String = "")
+  case class EngineAuthData(engineId: String, accessKey: String)
 
-  def authorizeAPI: RequestContext => Future[Authentication[EngineAuthData]] = {
+  def withSecurityKeyOnly: RequestContext => Future[Authentication[Unit]] = {
     ctx: RequestContext =>
-      val engineIdParamOpt = ctx.request.uri.query.get("engineId")
+      val securityKeyParamOpt = ctx.request.uri.query.get("securityKey")
       Future {
-        Right(EngineAuthData())
+        Storage.getMetaDataServerConfigs.get().map{ svConfig =>
+          securityKeyParamOpt.map{ securityKey =>
+            if(securityKey == svConfig.securityKey){
+              Right()
+            } else {
+              FailedAuth
+            }
+          }.getOrElse{
+            ctx.request.headers.find(_.name == "Authorization").map { authHeader =>
+              authHeader.value.split("Basic ") match {
+                case Array(_, value) =>
+                  val securityKey =
+                    new String(base64Decoder.decodeBuffer(value)).trim.split(":")(0)
+                    if(securityKey == svConfig.securityKey){
+                      Right()
+                    } else {
+                      FailedAuth
+                    }
+                case _ => FailedAuth
+              }
+            }.getOrElse(FailedAuth)
+          }
+        }.getOrElse{
+          logger.warning(s"No security key is configured")
+          Right()
+        }
       }
   }
 
   /* with accessKey in query/header, return appId if succeed */
   def withAccessKey: RequestContext => Future[Authentication[AuthData]] = {
     ctx: RequestContext =>
+      val securityKeyParamOpt = ctx.request.uri.query.get("securityKey")
       val accessKeyParamOpt = ctx.request.uri.query.get("accessKey")
       val channelParamOpt = ctx.request.uri.query.get("channel")
       Future {
         // with accessKey in query, return appId if succeed
-        accessKeyParamOpt.map { accessKeyParam =>
-          accessKeysClient.get(accessKeyParam).map { k =>
-            channelParamOpt.map { ch =>
-              val channelMap =
-                channelsClient.getByAppid(k.appid)
-                .map(c => (c.name, c.id)).toMap
-              if (channelMap.contains(ch)) {
-                Right(AuthData(k.appid, Some(channelMap(ch)), k.events))
+        securityKeyParamOpt.map { securityKey =>
+          accessKeyParamOpt.map { accessKeyParam =>
+            Storage.getMetaDataServerConfigs.get().map{ svConfig =>
+              if(securityKey == svConfig.securityKey){
+                accessKeysClient.get(accessKeyParam).map { k =>
+                  channelParamOpt.map { ch =>
+                    val channelMap =
+                      channelsClient.getByAppid(k.appid)
+                      .map(c => (c.name, c.id)).toMap
+                    if (channelMap.contains(ch)) {
+                      Right(AuthData(k.appid, Some(channelMap(ch)), k.events))
+                    } else {
+                      Left(ChannelRejection(s"Invalid channel '$ch'."))
+                    }
+                  }.getOrElse{
+                    Right(AuthData(k.appid, None, k.events))
+                  }
+                }.getOrElse(FailedAuth)
               } else {
-                Left(ChannelRejection(s"Invalid channel '$ch'."))
+                FailedAuth
               }
             }.getOrElse{
-              Right(AuthData(k.appid, None, k.events))
-            }
-          }.getOrElse(FailedAuth)
-        }.getOrElse {
-          // with accessKey in header, return appId if succeed
-          ctx.request.headers.find(_.name == "Authorization").map { authHeader =>
-            authHeader.value.split("Basic ") match {
-              case Array(_, value) =>
-                val appAccessKey =
-                  new String(base64Decoder.decodeBuffer(value)).trim.split(":")(0)
-                accessKeysClient.get(appAccessKey) match {
-                  case Some(k) => Right(AuthData(k.appid, None, k.events))
-                  case None => FailedAuth
+              accessKeysClient.get(accessKeyParam).map { k =>
+                channelParamOpt.map { ch =>
+                  val channelMap =
+                    channelsClient.getByAppid(k.appid)
+                    .map(c => (c.name, c.id)).toMap
+                  if (channelMap.contains(ch)) {
+                    Right(AuthData(k.appid, Some(channelMap(ch)), k.events))
+                  } else {
+                    Left(ChannelRejection(s"Invalid channel '$ch'."))
+                  }
+                }.getOrElse{
+                  Right(AuthData(k.appid, None, k.events))
                 }
-
-              case _ => FailedAuth
+              }.getOrElse(FailedAuth)
             }
-          }.getOrElse(MissedAuth)
+          }.getOrElse{
+            // with accessKey in header, return appId if succeed
+            ctx.request.headers.find(_.name == "Authorization").map { authHeader =>
+              authHeader.value.split("Basic ") match {
+                case Array(_, value) =>
+                  val appAccessKey =
+                    new String(base64Decoder.decodeBuffer(value)).trim.split(":")(0)
+                    accessKeysClient.get(appAccessKey) match {
+                      case Some(k) => Right(AuthData(k.appid, None, k.events))
+                      case None => FailedAuth
+                    }
+                case _ => FailedAuth
+              }
+            }.getOrElse(MissedAuth)
+          }
+        }.getOrElse {
+          if(Storage.getMetaDataServerConfigs.get() == None){
+            logger.warning(s"No Security Key is configured")
+            accessKeyParamOpt.map { accessKeyParam =>
+              accessKeysClient.get(accessKeyParam).map { k =>
+                channelParamOpt.map { ch =>
+                  val channelMap =
+                    channelsClient.getByAppid(k.appid)
+                    .map(c => (c.name, c.id)).toMap
+                  if (channelMap.contains(ch)) {
+                    Right(AuthData(k.appid, Some(channelMap(ch)), k.events))
+                  } else {
+                    Left(ChannelRejection(s"Invalid channel '$ch'."))
+                  }
+                }.getOrElse{
+                  Right(AuthData(k.appid, None, k.events))
+                }
+              }.getOrElse(FailedAuth)
+            }.getOrElse{
+              // with accessKey in header, return appId if succeed
+              ctx.request.headers.find(_.name == "Authorization").map { authHeader =>
+                authHeader.value.split("Basic ") match {
+                  case Array(_, value) =>
+                    val appAccessKey =
+                      new String(base64Decoder.decodeBuffer(value)).trim.split(":")(0)
+                      accessKeysClient.get(appAccessKey) match {
+                        case Some(k) => Right(AuthData(k.appid, None, k.events))
+                        case None => FailedAuth
+                      }
+                  case _ => FailedAuth
+                }
+              }.getOrElse(MissedAuth)
+            }
+          }else{
+            FailedAuth
+          }
         }
       }
   }
@@ -217,32 +309,76 @@ class  EventServiceActor(
     s"event data for ${engineId} cleared"
   }
 
-  def trainEngine(engineId: String) = {
-    val manifests = Storage.getMetaDataEngineManifests
-    manifests.get(engineId, engineId) map {manifest =>
-      val baseEngine = manifest.baseEngine 
-      val newManifest = manifest.copy(trainingStatus = "INIT")
-      manifests.update(newManifest)
-      val training: Future[String] = Future {
-      val stream = Process(Seq(
-        "pio", 
-        "train", 
-        s"--engine-id ${engineId}", 
-        s"--base-engine-url ${pio_root}/engines/${baseEngine}", 
-        s"--base-engine-id ${baseEngine}",
-        s"--variant ${pio_root}/engines/engine-params/${engineId}.json"), 
-      new File(s"${pio_root}/engines/${baseEngine}")).lines
-      
-      stream foreach println
-      engineId
+  def trainEngine(engineData: EngineData) = {
+    if(trainingLeft > 0){
+      var engineId = engineData.engineId
+      if(engineId == ""){
+        engineId = trainingQueue.dequeue().engineId
+        System.out.println(s"Grabbed $engineId from queue")
       }
+      val manifests = Storage.getMetaDataEngineManifests
+      manifests.get(engineId, engineId) map {manifest =>
+        val baseEngine = manifest.baseEngine 
+        val newManifest = manifest.copy(trainingStatus = "INIT")
+        manifests.update(newManifest)
+        trainingLeft -= 1
+        val training: Future[String] = Future {
+          System.out.println(s"Training started for ${engineId}, number of training left is $trainingLeft")
+          val stream = Process(Seq(
+            "pio", 
+            "train", 
+            s"--engine-id ${engineId}", 
+            s"--base-engine-url ${pio_root}/engines/${baseEngine}", 
+            s"--base-engine-id ${baseEngine}",
+            s"--variant ${pio_root}/engines/engine-params/${engineId}.json"), 
+          new File(s"${pio_root}/engines/${baseEngine}")).lines
+          var output = ""
+          //stream foreach println
+          for (line <- stream){
+            output = line
+          }
+          engineId
+        }
 
-      training onComplete {
-        case Success(_) => 
-        case Failure(t) => println("An error has occured at train: " + t.getMessage)
+        training onComplete {
+          case Success(id) => {
+                              
+                              trainingLeft += 1
+                              System.out.println(s"training finished for ${id}, number of training left is $trainingLeft")
+                              checkForTrainingJobs()
+                              }
+          case Failure(t) => println("An error has occured at train: " + t.getMessage)
+        }
+      } getOrElse {
+        error(s"No engineManifest can be found for $engineId")
       }
-    } getOrElse {
-      error(s"No engineManifest can be found for $engineId")
+    }else{
+      if(engineData.engineId != ""){
+        System.out.println(s"Training queued for ${engineData.engineId}")
+        trainingQueue.enqueue(engineData)
+      }      
+    }
+    
+  }
+
+  def checkForTrainingJobs() = {
+    implicit val formats = DefaultFormats.lossless
+
+    val data = Map(
+                  "engineId" -> "",
+                  "accessKey" -> "",
+                  "baseEngine" -> "")
+    val serverConfig = Storage.getMetaDataServerConfigs.get().getOrElse(new ServerConfig())
+    val securityKey = serverConfig.securityKey
+
+    val f: Future[Int] = Future {
+      scalaj.http.Http(
+        s"http://localhost:7070/" +
+        s"engine/train?securityKey=$securityKey").postData(
+          write(data)
+        ).header(
+          "content-type", "application/json"
+        ).asString.code
     }
   }
 
@@ -506,13 +642,15 @@ class  EventServiceActor(
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            entity(as[EngineData]) {data =>
-              val baseEngine = data.baseEngine
-              val engineAuthData = registerEngine(baseEngine)
-              val formattedData = Map("engineId" -> engineAuthData.engineId,
-                                      "accessKey" -> engineAuthData.accessKey)
-              respondWithMediaType(MediaTypes.`application/json`) {
-                complete(write(formattedData))
+            authenticate(withSecurityKeyOnly) { _ =>
+              entity(as[EngineData]) {data =>
+                val baseEngine = data.baseEngine
+                val engineAuthData = registerEngine(baseEngine)
+                val formattedData = Map("engineId" -> engineAuthData.engineId,
+                                        "accessKey" -> engineAuthData.accessKey)
+                respondWithMediaType(MediaTypes.`application/json`) {
+                  complete(write(formattedData))
+                }
               }
             }
           }
@@ -520,7 +658,7 @@ class  EventServiceActor(
       }~
       delete {
         handleExceptions(Common.exceptionHandler) {
-          handleRejections(rejectionHandler) {
+          handleRejections(rejectionHandler) { 
             authenticate(withAccessKey) { authData =>
               entity(as[EngineData]) {data =>
                 complete {
@@ -555,12 +693,11 @@ class  EventServiceActor(
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            authenticate(withAccessKey) { authData =>
+            authenticate(withSecurityKeyOnly) { _ =>
               entity(as[EngineData]) {data =>
                 complete {
-                  val engineId = data.engineId
-                  trainEngine(engineId)
-                  s"training started for engine $engineId"
+                  trainEngine(data)
+                  s"training started for engine ${data.engineId}"
                 }
               }
             }
@@ -573,7 +710,7 @@ class  EventServiceActor(
       post{
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {
-            authenticate(withAccessKey){ authData =>
+            authenticate(withSecurityKeyOnly){ _ =>
               entity(as[EngineData]) {data =>
                 val engineId = data.engineId
                 val status = getTrainStatus(engineId)

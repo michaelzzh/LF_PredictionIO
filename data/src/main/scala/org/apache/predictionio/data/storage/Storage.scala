@@ -382,6 +382,9 @@ object Storage extends Logging {
   private[predictionio] def getMetaDataChannels(): Channels =
     getDataObjectFromRepo[Channels](MetaDataRepository)
 
+  private[predictionio] def getMetaDataServerConfigs(): ServerConfigs =
+    getDataObjectFromRepo[ServerConfigs](MetaDataRepository)
+
   private[predictionio] def getModelDataModels(): Models =
     getDataObjectFromRepo[Models](ModelDataRepository)
 

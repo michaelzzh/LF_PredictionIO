@@ -24,6 +24,7 @@ libraryDependencies ++= Seq(
   "io.spray"               %% "spray-client"   % "1.3.3",
   "io.spray"               %% "spray-routing"  % "1.3.3",
   "io.spray"               %% "spray-testkit"  % "1.3.3" % "test",
+  "org.scalaj"             %% "scalaj-http"    % "1.1.6",
   "mysql"                   % "mysql-connector-java" % "5.1.37" % "optional",
   "org.apache.hadoop"       % "hadoop-common"  % "2.6.2"
     exclude("javax.servlet", "servlet-api"),

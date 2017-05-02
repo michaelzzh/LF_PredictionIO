@@ -197,20 +197,6 @@ class  EventServiceActor(
               }
             }.getOrElse{
               FailedAuth
-              // accessKeysClient.get(accessKeyParam).map { k =>
-              //   channelParamOpt.map { ch =>
-              //     val channelMap =
-              //       channelsClient.getByAppid(k.appid)
-              //       .map(c => (c.name, c.id)).toMap
-              //     if (channelMap.contains(ch)) {
-              //       Right(AuthData(k.appid, Some(channelMap(ch)), k.events))
-              //     } else {
-              //       Left(ChannelRejection(s"Invalid channel '$ch'."))
-              //     }
-              //   }.getOrElse{
-              //     Right(AuthData(k.appid, None, k.events))
-              //   }
-              // }.getOrElse(FailedAuth)
             }
           }.getOrElse{
             // with accessKey in header, return appId if succeed
@@ -325,7 +311,7 @@ class  EventServiceActor(
   }
 
   def trainEngine(engineData: EngineData) = {
-    if(trainingLeft > 0){
+    if(trainingLeft > 0 && (trainingQueue.size == 0 || engineData.engineId == "")){
       var engineId = engineData.engineId
       if(engineId == ""){
         engineId = trainingQueue.dequeue().engineId
@@ -362,7 +348,10 @@ class  EventServiceActor(
                               System.out.println(s"training finished for ${id}, number of training left is $trainingLeft")
                               checkForTrainingJobs()
                               }
-          case Failure(t) => println("An error has occured at train: " + t.getMessage)
+          case Failure(t) => {
+                              error("An error has occured at train: " + t.getMessage)
+                              checkForTrainingJobs()
+                              }
         }
       } getOrElse {
         error(s"No engineManifest can be found for $engineId")

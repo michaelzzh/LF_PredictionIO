@@ -109,6 +109,16 @@ class HBLEvents(val client: HBClient, config: StorageClientConfig, val namespace
     }
   }
 
+  //To be implemented if have time
+  def futureGetEntityIds(appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext):
+    Future[Iterator[String]] = {
+      throw new NotImplementedError("get entityIds is not implemented for hbase")
+    }
+
+  def getEntityIds(appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext): Seq[String] = {
+    throw new NotImplementedError("get entityIds is not implemented for hbase")
+  }
+
   override
   def futureGet(
     eventId: String, appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext):

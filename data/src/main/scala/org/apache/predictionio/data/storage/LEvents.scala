@@ -91,11 +91,24 @@ trait LEvents {
     event: Event, appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext): Future[String]
 
   /** :: DeveloperApi ::
+    * Get a list of entityIds in a non-blocking fashion.
+    * 
+    * @param appId App ID for the entityIds to be retrieved from
+    * @param channelId Optional channel ID for the entityIds to be retrieved from   
+    */
+  @DeveloperApi
+  def futureGetEntityIds(appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext): Future[Iterator[String]]
+
+  @DeveloperApi
+  def getEntityIds(appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext): Seq[String]
+
+  /** :: DeveloperApi ::
     * Get an [[Event]] in a non-blocking fashion.
     *
     * @param eventId ID of the [[Event]]
     * @param appId ID of the app that contains the [[Event]]
     */
+
   @DeveloperApi
   def futureGet(eventId: String, appId: Int)(implicit ec: ExecutionContext):
     Future[Option[Event]] = futureGet(eventId, appId, None)

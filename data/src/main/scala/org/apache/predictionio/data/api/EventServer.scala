@@ -684,6 +684,21 @@ class  EventServiceActor(
     }~
     path("engine" / "data"){
       import Json4sProtocol._
+      get {
+        handleExceptions(Common.exceptionHandler) {
+          handleRejections(rejectionHandler) {
+            authenticate(withAccessKey) {authData =>
+              val entityIdLst = eventClient.getEntityIds(authData.appId, authData.channelId)
+              val payload = Map("entityIds" -> entityIdLst)
+              respondWithMediaType(MediaTypes.`application/json`) {
+                complete{
+                  write(payload) 
+                }
+              }                           
+            }
+          }
+        }
+      }~
       delete {
         handleExceptions(Common.exceptionHandler) {
           handleRejections(rejectionHandler) {

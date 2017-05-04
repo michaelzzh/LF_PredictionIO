@@ -127,6 +127,29 @@ class JDBCLEvents(
     }
   }
 
+  def futureGetEntityIds(appId: Int, channelId: Option[Int])(
+    implicit ec: ExecutionContext): Future[Iterator[String]] = Future {
+    DB readOnly { implicit session =>
+      val tableName = sqls.createUnsafely(JDBCUtils.eventTableName(namespace, appId, channelId))
+      sql"""
+      select
+        entityId
+      from $tableName ORDER BY entityId
+      """.map(resultToEntityId).list().apply().toIterator
+    }
+  }
+
+  def getEntityIds(appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext): Seq[String] = {
+    DB readOnly { implicit session =>
+      val tableName = sqls.createUnsafely(JDBCUtils.eventTableName(namespace, appId, channelId))
+      sql"""
+      select
+        entityId
+      from $tableName ORDER BY entityId
+      """.map(resultToEntityId).list().apply()
+    }
+  }
+
   def futureGet(eventId: String, appId: Int, channelId: Option[Int])(
     implicit ec: ExecutionContext): Future[Option[Event]] = Future {
     DB readOnly { implicit session =>
@@ -240,5 +263,9 @@ class JDBCLEvents(
       creationTime = new DateTime(rs.jodaDateTime("creationTime"),
         DateTimeZone.forID(rs.string("creationTimeZone")))
     )
+  }
+
+  private[predictionio] def resultToEntityId(rs: WrappedResultSet): String = {
+    rs.string("entityId")
   }
 }

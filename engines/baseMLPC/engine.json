@@ -1,17 +1,17 @@
 {
-  "id": "base",
+  "id": "default",
   "description": "Default settings",
-  "engineFactory": "com.laserfiche.RegressionEngine",
+  "engineFactory": "com.laserfiche.VanillaEngine",
   "datasource": {
-    "params": {
+    "params" : {
       "appName": "INVALID_APP_NAME"
     }
   },
   "algorithms": [
     {
-      "name": "linearRegression",
+      "name": "algo",
       "params": {
-        "intercept": 1.0
+        "mult" : 1
       }
     }
   ]

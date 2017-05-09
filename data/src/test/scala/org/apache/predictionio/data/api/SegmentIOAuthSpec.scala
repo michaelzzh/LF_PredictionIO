@@ -55,6 +55,14 @@ class SegmentIOAuthSpec extends Specification {
         (implicit ec: ExecutionContext): Future[Option[Event]] =
       Future successful None
 
+    override def futureGetEntityIds(appId: Int,channelId: Option[Int])(implicit ec: scala.concurrent.ExecutionContext): Future[Seq[String]] = {}
+      throw new NotImplementedError("get entityIds is not implemented for hbase")
+    }
+
+    def getEntityIds(appId: Int, channelId: Option[Int])(implicit ec: ExecutionContext): Seq[String] = {
+      throw new NotImplementedError("get entityIds is not implemented for hbase")
+    }
+
     override def remove(appId: Int, channelId: Option[Int]): Boolean = true
 
     override def futureDelete(eventId: String, appId: Int, channelId: Option[Int])

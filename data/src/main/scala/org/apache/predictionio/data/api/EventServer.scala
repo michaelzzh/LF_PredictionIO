@@ -349,7 +349,11 @@ class  EventServiceActor(
                               checkForTrainingJobs()
                               }
           case Failure(t) => {
+                              trainingLeft += 1
+                              val newManifest = manifest.copy(trainingStatus = "FAILED")
+                              manifests.update(newManifest)
                               error("An error has occured at train: " + t.getMessage)
+                              System.out.println(s"training failed, number of training left is $trainingLeft")
                               checkForTrainingJobs()
                               }
         }

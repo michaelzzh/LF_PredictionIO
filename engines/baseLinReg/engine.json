@@ -1,0 +1,18 @@
+{
+  "id": "base",
+  "description": "Default settings",
+  "engineFactory": "com.laserfiche.LinearRegressionEngine",
+  "datasource": {
+    "params" : {
+      "appName": "INVALID_APP_NAME"
+    }
+  },
+  "algorithms": [
+    {
+      "name": "linearReg",
+      "params": {
+        "intercept" : 1
+      }
+    }
+  ]
+}

@@ -606,7 +606,7 @@ class EngineServerActor[Q, P](
                 "predictions" -> resultData.predictions.map(re => Map("queryId" -> re.queryId, "resultString" -> re.resultString))
               )
               respondWithMediaType(`application/json`) {
-                complete(write(formatedData))
+                complete(formatedData)
               }
 
             } catch {

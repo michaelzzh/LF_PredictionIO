@@ -287,7 +287,7 @@ class  EventServiceActor(
     val accessKey = generateAccessKey()
     Future{
       Process(Seq("pio", "register", s"--engine-id ${id}", s"--base-engine-url ${pio_root}/engines/${baseEngine}", s"--base-engine-id $baseEngine"),
-      new File(s"${pio_root}/engines/${baseEngine}")).!
+        new File(s"${pio_root}/engines/${baseEngine}")).!
       Process(Seq("pio", "app", "new", id, "--access-key", accessKey)).!
     }
     EngineAuthData(engineId = id, accessKey = accessKey)
@@ -664,7 +664,7 @@ class  EventServiceActor(
                 val formattedData = Map("engineId" -> engineAuthData.engineId,
                                         "accessKey" -> engineAuthData.accessKey)
                 respondWithMediaType(MediaTypes.`application/json`) {
-                  complete(write(formattedData))
+                  complete(formattedData)
                 }
               }
             }
@@ -695,9 +695,7 @@ class  EventServiceActor(
               val entityIdLst = eventClient.getEntityIds(authData.appId, authData.channelId)
               val payload = Map("entityIds" -> entityIdLst)
               respondWithMediaType(MediaTypes.`application/json`) {
-                complete{
-                  write(payload) 
-                }
+                complete(payload)
               }                           
             }
           }
@@ -746,7 +744,7 @@ class  EventServiceActor(
                 val status = getTrainStatus(engineId)
                 val formatedData = Map("status" -> status)
                 respondWithMediaType(MediaTypes.`application/json`) {
-                  complete(write(formatedData))
+                  complete(formatedData)
                 }
               }
             }

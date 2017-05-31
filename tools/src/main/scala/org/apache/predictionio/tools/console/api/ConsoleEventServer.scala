@@ -552,12 +552,12 @@ class  ConsoleEventServiceActor(
                 complete {
                   if (events.isEmpty || authData.events.contains(event.event)) {
                     pluginContext.inputBlockers.values.foreach(
-                      _.process(EventInfo(
+                      _.process(ConsoleEventInfo(
                         appId = appId,
                         channelId = channelId,
                         event = event), pluginContext))
                     val data = eventClient.futureInsert(event, appId, channelId).map { id =>
-                      pluginsActorRef ! EventInfo(
+                      pluginsActorRef ! ConsoleEventInfo(
                         appId = appId,
                         channelId = channelId,
                         event = event)
@@ -767,12 +767,12 @@ class  ConsoleEventServiceActor(
                 case Success(event) => {
                   if (allowedEvents.isEmpty || allowedEvents.contains(event.event)) {
                     pluginContext.inputBlockers.values.foreach(
-                      _.process(EventInfo(
+                      _.process(ConsoleEventInfo(
                         appId = appId,
                         channelId = channelId,
                         event = event), pluginContext))
                     val data = eventClient.futureInsert(event, appId, channelId).map { id =>
-                      pluginsActorRef ! EventInfo(
+                      pluginsActorRef ! ConsoleEventInfo(
                         appId = appId,
                         channelId = channelId,
                         event = event)

@@ -20,7 +20,7 @@ package org.apache.predictionio.tools.console.api
 
 import org.apache.predictionio.data.storage.Event
 
-case class EventInfo(
+case class ConsoleEventInfo(
   appId: Int,
   channelId: Option[Int],
   event: Event)

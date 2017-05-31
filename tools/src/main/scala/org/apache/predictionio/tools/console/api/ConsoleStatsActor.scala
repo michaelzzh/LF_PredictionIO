@@ -31,9 +31,9 @@ import com.github.nscala_time.time.Imports.DateTime
 case class Bookkeeping(val appId: Int, statusCode: StatusCode, event: Event)
 
 /* message to StatsActor */
-case class GetStats(val appId: Int)
+case class GetConsoleStats(val appId: Int)
 
-class StatsActor extends Actor {
+class ConsoleStatsActor extends Actor {
   implicit val system = context.system
   val log = Logging(system, this)
 
@@ -44,10 +44,10 @@ class StatsActor extends Actor {
       withMillisOfSecond(0)
   }
 
-  var longLiveStats = new Stats(DateTime.now)
-  var hourlyStats = new Stats(getCurrent)
+  var longLiveStats = new ConsoleStats(DateTime.now)
+  var hourlyStats = new ConsoleStats(getCurrent)
 
-  var prevHourlyStats = new Stats(getCurrent.minusHours(1))
+  var prevHourlyStats = new ConsoleStats(getCurrent.minusHours(1))
   prevHourlyStats.cutoff(hourlyStats.startTime)
 
   def bookkeeping(appId: Int, statusCode: StatusCode, event: Event) {
@@ -57,7 +57,7 @@ class StatsActor extends Actor {
     if (current != hourlyStats.startTime) {
       prevHourlyStats = hourlyStats
       prevHourlyStats.cutoff(current)
-      hourlyStats = new Stats(current)
+      hourlyStats = new ConsoleStats(current)
     }
 
     hourlyStats.update(appId, statusCode, event)
@@ -67,7 +67,7 @@ class StatsActor extends Actor {
   def receive: Actor.Receive = {
     case Bookkeeping(appId, statusCode, event) =>
       bookkeeping(appId, statusCode, event)
-    case GetStats(appId) => sender() ! Map(
+    case GetConsoleStats(appId) => sender() ! Map(
       "time" -> DateTime.now,
       "currentHour" -> hourlyStats.get(appId),
       "prevHour" -> prevHourlyStats.get(appId),

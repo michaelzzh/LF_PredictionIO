@@ -21,7 +21,7 @@ package org.apache.predictionio.tools.console.api
 import akka.actor.Actor
 import akka.event.Logging
 
-class PluginsActor() extends Actor {
+class ConsolePluginsActor() extends Actor {
   implicit val system = context.system
   val log = Logging(system, this)
 
@@ -30,7 +30,7 @@ class PluginsActor() extends Actor {
   def receive: PartialFunction[Any, Unit] = {
     case e: ConsoleEventInfo =>
       pluginContext.inputSniffers.values.foreach(_.process(e, pluginContext))
-    case h: PluginsActor.HandleREST =>
+    case h: ConsolePluginsActor.HandleREST =>
       try {
         sender() ! pluginContext.inputSniffers(h.pluginName).handleREST(
           h.appId,
@@ -45,7 +45,7 @@ class PluginsActor() extends Actor {
   }
 }
 
-object PluginsActor {
+object ConsolePluginsActor {
   case class HandleREST(
     pluginName: String,
     appId: Int,

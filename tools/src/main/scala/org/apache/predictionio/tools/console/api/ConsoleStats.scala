@@ -40,7 +40,7 @@ case class EntityTypesEvent(
 
 case class KV[K, V](key: K, value: V)
 
-case class StatsSnapshot(
+case class ConsoleStatsSnapshot(
   val startTime: DateTime,
   val endTime: Option[DateTime],
   val basic: Seq[KV[EntityTypesEvent, Long]],
@@ -48,7 +48,7 @@ case class StatsSnapshot(
 )
 
 
-class Stats(val startTime: DateTime) {
+class ConsoleStats(val startTime: DateTime) {
   private[this] var _endTime: Option[DateTime] = None
   var statusCodeCount = MHashMap[(Int, StatusCode), Long]().withDefaultValue(0L)
   var eteCount = MHashMap[(Int, EntityTypesEvent), Long]().withDefaultValue(0L)
@@ -71,8 +71,8 @@ class Stats(val startTime: DateTime) {
     }
   }
 
-  def get(appId: Int): StatsSnapshot = {
-    StatsSnapshot(
+  def get(appId: Int): ConsoleStatsSnapshot = {
+    ConsoleStatsSnapshot(
       startTime,
       _endTime,
       extractByAppId(appId, eteCount),

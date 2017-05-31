@@ -472,7 +472,7 @@ class  ConsoleEventServiceActor(
                       authData.channelId,
                       pluginArgs)
                   case ConsoleEventServerPlugin.inputSniffer =>
-                    pluginsActorRef ? PluginsActor.HandleREST(
+                    pluginsActorRef ? ConsolePluginsActor.HandleREST(
                       appId = authData.appId,
                       channelId = authData.channelId,
                       pluginName = pluginName,
@@ -831,8 +831,8 @@ class  ConsoleEventServiceActor(
               respondWithMediaType(MediaTypes.`application/json`) {
                 if (config.stats) {
                   complete {
-                    statsActorRef ? GetStats(appId) map {
-                      _.asInstanceOf[Map[String, StatsSnapshot]]
+                    statsActorRef ? GetConsoleStats(appId) map {
+                      _.asInstanceOf[Map[String, ConsoleStatsSnapshot]]
                     }
                   }
                 } else {
@@ -1008,8 +1008,8 @@ object ConsoleEventServer {
         config),
       "ConsoleEventServerActor"
     )
-    if (config.stats) system.actorOf(Props[StatsActor], "StatsActor")
-    system.actorOf(Props[PluginsActor], "PluginsActor")
+    if (config.stats) system.actorOf(Props[ConsoleStatsActor], "ConsoleStatsActor")
+    system.actorOf(Props[ConsolePluginsActor], "ConsolePluginsActor")
     serverActor ! StartServer(config.ip, config.port)
     system.awaitTermination()
   }

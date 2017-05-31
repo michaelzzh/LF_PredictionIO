@@ -859,7 +859,7 @@ class  ConsoleEventServiceActor(
               respondWithMediaType(MediaTypes.`application/json`) {
                 entity(as[JObject]) { jObj =>
                   complete {
-                    Webhooks.postJson(
+                    ConsoleWebhooks.postJson(
                       appId = appId,
                       channelId = channelId,
                       web = web,
@@ -883,7 +883,7 @@ class  ConsoleEventServiceActor(
               val channelId = authData.channelId
               respondWithMediaType(MediaTypes.`application/json`) {
                 complete {
-                  Webhooks.getJson(
+                  ConsoleWebhooks.getJson(
                     appId = appId,
                     channelId = channelId,
                     web = web,
@@ -909,7 +909,7 @@ class  ConsoleEventServiceActor(
                     // respond with JSON
                     import Json4sProtocol._
 
-                    Webhooks.postForm(
+                    ConsoleWebhooks.postForm(
                       appId = appId,
                       channelId = channelId,
                       web = web,
@@ -936,7 +936,7 @@ class  ConsoleEventServiceActor(
                   // respond with JSON
                   import Json4sProtocol._
 
-                  Webhooks.getForm(
+                  ConsoleWebhooks.getForm(
                     appId = appId,
                     channelId = channelId,
                     web = web,

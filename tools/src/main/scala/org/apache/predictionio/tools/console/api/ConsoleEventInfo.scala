@@ -16,7 +16,7 @@
  */
 
 
-package org.apache.predictionio.data.api
+package org.apache.predictionio.tools.console.api
 
 import org.apache.predictionio.data.storage.Event
 

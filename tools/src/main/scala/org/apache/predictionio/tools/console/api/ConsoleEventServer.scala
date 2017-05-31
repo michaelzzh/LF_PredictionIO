@@ -86,7 +86,7 @@ class  EventServiceActor(
     val eventClient: LEvents,
     val accessKeysClient: AccessKeys,
     val channelsClient: Channels,
-    val config: EventServerConfig) extends HttpServiceActor {
+    val config: ConsoleEventServerConfig) extends HttpServiceActor {
 
   object Json4sProtocol extends Json4sSupport {
     implicit def json4sFormats: Formats = DefaultFormats +
@@ -965,7 +965,7 @@ class EventServerActor(
     val eventClient: LEvents,
     val accessKeysClient: AccessKeys,
     val channelsClient: Channels,
-    val config: EventServerConfig) extends Actor with ActorLogging {
+    val config: ConsoleEventServerConfig) extends Actor with ActorLogging {
   val child = context.actorOf(
     Props(classOf[EventServiceActor],
       eventClient,
@@ -985,14 +985,14 @@ class EventServerActor(
   }
 }
 
-case class EventServerConfig(
+case class ConsoleEventServerConfig(
   ip: String = "localhost",
   port: Int = 7070,
   plugins: String = "plugins",
   stats: Boolean = false)
 
-object ConsoleEventServer {
-  def createEventServer(config: EventServerConfig): Unit = {
+object EventServer {
+  def createEventServer(config: ConsoleEventServerConfig): Unit = {
     implicit val system = ActorSystem("EventServerSystem")
 
     val eventClient = Storage.getLEvents()
@@ -1017,7 +1017,7 @@ object ConsoleEventServer {
 
 object Run {
   def main(args: Array[String]) {
-    EventServer.createEventServer(EventServerConfig(
+    EventServer.createEventServer(ConsoleEventServerConfig(
       ip = "0.0.0.0",
       port = 7070))
   }

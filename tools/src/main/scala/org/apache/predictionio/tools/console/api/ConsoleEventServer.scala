@@ -114,7 +114,7 @@ class  ConsoleEventServiceActor(
 
   implicit val timeout = Timeout(5, TimeUnit.SECONDS)
 
-  val rejectionHandler = Common.rejectionHandler
+  val rejectionHandler = ConsoleCommon.rejectionHandler
 
   val jsonPath = """(.+)\.json$""".r
   val formPath = """(.+)\.form$""".r
@@ -458,7 +458,7 @@ class  ConsoleEventServiceActor(
     } ~
     path("plugins" / Segments) { segments =>
       get {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           authenticate(withAccessKey) { authData =>
             respondWithMediaType(MediaTypes.`application/json`) {
               complete {
@@ -491,7 +491,7 @@ class  ConsoleEventServiceActor(
       import Json4sProtocol._
 
       get {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -514,7 +514,7 @@ class  ConsoleEventServiceActor(
         }
       } ~
       delete {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -542,7 +542,7 @@ class  ConsoleEventServiceActor(
       import Json4sProtocol._
 
       post {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -579,7 +579,7 @@ class  ConsoleEventServiceActor(
         }
       } ~
       get {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -655,7 +655,7 @@ class  ConsoleEventServiceActor(
     path("engine" / "register") {
       import Json4sProtocol._
       post{
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withSecurityKeyOnly) { _ =>
               entity(as[EngineData]) {data =>
@@ -672,7 +672,7 @@ class  ConsoleEventServiceActor(
         }
       }~
       delete {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) { 
             authenticate(withAccessKey) { authData =>
               entity(as[EngineData]) {data =>
@@ -689,7 +689,7 @@ class  ConsoleEventServiceActor(
     path("engine" / "data"){
       import Json4sProtocol._
       get {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) {authData =>
               val entityIdLst = eventClient.getEntityIds(authData.appId, authData.channelId)
@@ -702,7 +702,7 @@ class  ConsoleEventServiceActor(
         }
       }~
       delete {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) {authData =>
               entity(as[EngineData]) {data =>
@@ -719,7 +719,7 @@ class  ConsoleEventServiceActor(
     path("engine" / "train"){
       import Json4sProtocol._
       post{
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { _ =>
               entity(as[EngineData]) {data =>
@@ -736,7 +736,7 @@ class  ConsoleEventServiceActor(
     path("engine" / "status"){
       import Json4sProtocol._
       post{
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey){ _ =>
               entity(as[EngineData]) {data =>
@@ -757,7 +757,7 @@ class  ConsoleEventServiceActor(
       import Json4sProtocol._
 
       post {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -824,7 +824,7 @@ class  ConsoleEventServiceActor(
       import Json4sProtocol._
 
       get {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -851,7 +851,7 @@ class  ConsoleEventServiceActor(
       import Json4sProtocol._
 
       post {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -876,7 +876,7 @@ class  ConsoleEventServiceActor(
         }
       } ~
       get {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -897,7 +897,7 @@ class  ConsoleEventServiceActor(
     } ~
     path("webhooks" / formPath ) { web =>
       post {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId
@@ -926,7 +926,7 @@ class  ConsoleEventServiceActor(
         }
       } ~
       get {
-        handleExceptions(Common.exceptionHandler) {
+        handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { authData =>
               val appId = authData.appId

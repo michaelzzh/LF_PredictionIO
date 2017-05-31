@@ -24,7 +24,7 @@ import org.apache.predictionio.data.webhooks.FormConnector
 import org.apache.predictionio.data.webhooks.segmentio.SegmentIOConnector
 import org.apache.predictionio.data.webhooks.mailchimp.MailChimpConnector
 
-private[predictionio] object WebhooksConnectors {
+private[predictionio] object ConsoleWebhooksConnectors {
 
   val json: Map[String, JsonConnector] = Map(
     "segmentio" -> SegmentIOConnector

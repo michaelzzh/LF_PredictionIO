@@ -56,7 +56,7 @@ private[predictionio] object ConsoleWebhooks {
   )(implicit ec: ExecutionContext): Future[(StatusCode, Map[String, String])] = {
 
     val eventFuture = Future {
-      WebhooksConnectors.json.get(web).map { connector =>
+      ConsoleWebhooksConnectors.json.get(web).map { connector =>
         ConnectorUtil.toEvent(connector, data)
       }
     }
@@ -89,7 +89,7 @@ private[predictionio] object ConsoleWebhooks {
     log: LoggingAdapter
   )(implicit ec: ExecutionContext): Future[(StatusCode, Map[String, String])] = {
     Future {
-      WebhooksConnectors.json.get(web).map { connector =>
+      ConsoleWebhooksConnectors.json.get(web).map { connector =>
         (StatusCodes.OK, Map("message" -> "Ok"))
       }.getOrElse {
         val message = s"webhooks connection for ${web} is not supported."
@@ -109,7 +109,7 @@ private[predictionio] object ConsoleWebhooks {
     statsActorRef: ActorSelection
   )(implicit ec: ExecutionContext): Future[(StatusCode, Map[String, String])] = {
     val eventFuture = Future {
-      WebhooksConnectors.form.get(web).map { connector =>
+      ConsoleWebhooksConnectors.form.get(web).map { connector =>
         ConnectorUtil.toEvent(connector, data.fields.toMap)
       }
     }
@@ -142,7 +142,7 @@ private[predictionio] object ConsoleWebhooks {
     log: LoggingAdapter
   )(implicit ec: ExecutionContext): Future[(StatusCode, Map[String, String])] = {
     Future {
-      WebhooksConnectors.form.get(web).map { connector =>
+      ConsoleWebhooksConnectors.form.get(web).map { connector =>
         (StatusCodes.OK, Map("message" -> "Ok"))
       }.getOrElse {
         val message = s"webhooks connection for ${web} is not supported."

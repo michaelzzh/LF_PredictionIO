@@ -23,9 +23,9 @@ trait ConsoleEventServerPlugin {
   val pluginDescription: String
   val pluginType: String
 
-  def start(context: EventServerPluginContext): Unit
+  def start(context: ConsoleEventServerPluginContext): Unit
 
-  def process(eventInfo: ConsoleEventInfo, context: EventServerPluginContext)
+  def process(eventInfo: ConsoleEventInfo, context: ConsoleEventServerPluginContext)
 
   def handleREST(appId: Int, channelId: Option[Int], arguments: Seq[String]): String
 }

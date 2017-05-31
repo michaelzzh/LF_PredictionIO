@@ -119,7 +119,7 @@ class  ConsoleEventServiceActor(
   val jsonPath = """(.+)\.json$""".r
   val formPath = """(.+)\.form$""".r
 
-  val pluginContext = EventServerPluginContext(logger)
+  val pluginContext = ConsoleEventServerPluginContext(logger)
 
   private lazy val base64Decoder = new BASE64Decoder
 

@@ -25,7 +25,7 @@ class PluginsActor() extends Actor {
   implicit val system = context.system
   val log = Logging(system, this)
 
-  val pluginContext = EventServerPluginContext(log)
+  val pluginContext = ConsoleEventServerPluginContext(log)
 
   def receive: PartialFunction[Any, Unit] = {
     case e: ConsoleEventInfo =>

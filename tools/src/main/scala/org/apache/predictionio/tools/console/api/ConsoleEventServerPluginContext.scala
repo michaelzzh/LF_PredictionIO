@@ -26,7 +26,7 @@ import grizzled.slf4j.Logging
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-class EventServerPluginContext(
+class ConsoleEventServerPluginContext(
     val plugins: mutable.Map[String, mutable.Map[String, ConsoleEventServerPlugin]],
     val log: LoggingAdapter) {
   def inputBlockers: Map[String, ConsoleEventServerPlugin] =
@@ -36,8 +36,8 @@ class EventServerPluginContext(
     plugins.getOrElse(ConsoleEventServerPlugin.inputSniffer, Map()).toMap
 }
 
-object EventServerPluginContext extends Logging {
-  def apply(log: LoggingAdapter): EventServerPluginContext = {
+object ConsoleEventServerPluginContext extends Logging {
+  def apply(log: LoggingAdapter): ConsoleEventServerPluginContext = {
     val plugins = mutable.Map[String, mutable.Map[String, ConsoleEventServerPlugin]](
       ConsoleEventServerPlugin.inputBlocker -> mutable.Map(),
       ConsoleEventServerPlugin.inputSniffer -> mutable.Map())
@@ -45,7 +45,7 @@ object EventServerPluginContext extends Logging {
     serviceLoader foreach { service =>
       plugins(service.pluginType) += service.pluginName -> service
     }
-    new EventServerPluginContext(
+    new ConsoleEventServerPluginContext(
       plugins,
       log)
   }

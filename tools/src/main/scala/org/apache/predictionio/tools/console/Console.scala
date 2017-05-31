@@ -24,7 +24,7 @@ import java.net.URI
 import grizzled.slf4j.Logging
 import org.apache.predictionio.controller.Utils
 import org.apache.predictionio.core.BuildInfo
-import org.apache.predictionio.tools.console.api.EventServer
+import org.apache.predictionio.tools.console.api.ConsoleEventServer
 import org.apache.predictionio.tools.console.api.ConsoleEventServerConfig
 import org.apache.predictionio.data.storage
 import org.apache.predictionio.data.storage.ServerConfig
@@ -972,7 +972,7 @@ object Console extends Logging {
   def eventserver(ca: ConsoleArgs): Unit = {
     info(
       s"Creating Event Server at ${ca.eventServer.ip}:${ca.eventServer.port}")
-    EventServer.createEventServer(ConsoleEventServerConfig(
+    ConsoleEventServer.createEventServer(ConsoleEventServerConfig(
       ip = ca.eventServer.ip,
       port = ca.eventServer.port,
       stats = ca.eventServer.stats))

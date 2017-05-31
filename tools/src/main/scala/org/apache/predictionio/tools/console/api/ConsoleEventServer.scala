@@ -979,7 +979,7 @@ class ConsoleEventServerActor(
     case StartServer(host, portNum) => {
       IO(Http) ! Http.Bind(child, interface = host, port = portNum)
     }
-    case m: Http.Bound => log.info("Bound received. EventServer is ready.")
+    case m: Http.Bound => log.info("Bound received. ConsoleEventServer is ready.")
     case m: Http.CommandFailed => log.error("Command failed.")
     case _ => log.error("Unknown message.")
   }
@@ -991,9 +991,9 @@ case class ConsoleEventServerConfig(
   plugins: String = "plugins",
   stats: Boolean = false)
 
-object EventServer {
+object ConsoleEventServer {
   def createEventServer(config: ConsoleEventServerConfig): Unit = {
-    implicit val system = ActorSystem("EventServerSystem")
+    implicit val system = ActorSystem("ConsoleEventServerSystem")
 
     val eventClient = Storage.getLEvents()
     val accessKeysClient = Storage.getMetaDataAccessKeys()
@@ -1017,7 +1017,7 @@ object EventServer {
 
 object Run {
   def main(args: Array[String]) {
-    EventServer.createEventServer(ConsoleEventServerConfig(
+    ConsoleEventServer.createEventServer(ConsoleEventServerConfig(
       ip = "0.0.0.0",
       port = 7070))
   }

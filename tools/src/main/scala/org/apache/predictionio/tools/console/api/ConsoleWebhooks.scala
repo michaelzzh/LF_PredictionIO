@@ -64,7 +64,7 @@ private[predictionio] object ConsoleWebhooks {
     eventFuture.flatMap { eventOpt =>
       if (eventOpt.isEmpty) {
         Future successful {
-          val message = s"webhooks connection for ${web} is not supported."
+          val message = s"console webhooks connection for ${web} is not supported."
           (StatusCodes.NotFound, Map("message" -> message))
         }
       } else {
@@ -92,7 +92,7 @@ private[predictionio] object ConsoleWebhooks {
       ConsoleWebhooksConnectors.json.get(web).map { connector =>
         (StatusCodes.OK, Map("message" -> "Ok"))
       }.getOrElse {
-        val message = s"webhooks connection for ${web} is not supported."
+        val message = s"console webhooks connection for ${web} is not supported."
         (StatusCodes.NotFound, Map("message" -> message))
       }
     }
@@ -117,7 +117,7 @@ private[predictionio] object ConsoleWebhooks {
     eventFuture.flatMap { eventOpt =>
       if (eventOpt.isEmpty) {
         Future {
-          val message = s"webhooks connection for ${web} is not supported."
+          val message = s"console webhooks connection for ${web} is not supported."
           (StatusCodes.NotFound, Map("message" -> message))
         }
       } else {
@@ -145,7 +145,7 @@ private[predictionio] object ConsoleWebhooks {
       ConsoleWebhooksConnectors.form.get(web).map { connector =>
         (StatusCodes.OK, Map("message" -> "Ok"))
       }.getOrElse {
-        val message = s"webhooks connection for ${web} is not supported."
+        val message = s"console webhooks connection for ${web} is not supported."
         (StatusCodes.NotFound, Map("message" -> message))
       }
     }

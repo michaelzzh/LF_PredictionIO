@@ -24,8 +24,8 @@ import java.net.URI
 import grizzled.slf4j.Logging
 import org.apache.predictionio.controller.Utils
 import org.apache.predictionio.core.BuildInfo
-import org.apache.predictionio.data.api.EventServer
-import org.apache.predictionio.data.api.EventServerConfig
+import org.apache.predictionio.tools.console.api.ConsoleEventServer
+import org.apache.predictionio.tools.console.api.ConsoleEventServerConfig
 import org.apache.predictionio.data.storage
 import org.apache.predictionio.data.storage.ServerConfig
 import org.apache.predictionio.data.storage.EngineManifest

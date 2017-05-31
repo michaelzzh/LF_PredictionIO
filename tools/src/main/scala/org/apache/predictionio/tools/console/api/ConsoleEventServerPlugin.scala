@@ -18,7 +18,7 @@
 
 package org.apache.predictionio.tools.console.api
 
-trait EventServerPlugin {
+trait ConsoleEventServerPlugin {
   val pluginName: String
   val pluginDescription: String
   val pluginType: String
@@ -30,7 +30,7 @@ trait EventServerPlugin {
   def handleREST(appId: Int, channelId: Option[Int], arguments: Seq[String]): String
 }
 
-object EventServerPlugin {
+object ConsoleEventServerPlugin {
   val inputBlocker = "inputblocker"
   val inputSniffer = "inputsniffer"
 }

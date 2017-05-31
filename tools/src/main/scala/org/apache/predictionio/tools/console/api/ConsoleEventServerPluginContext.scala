@@ -27,21 +27,21 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 
 class EventServerPluginContext(
-    val plugins: mutable.Map[String, mutable.Map[String, EventServerPlugin]],
+    val plugins: mutable.Map[String, mutable.Map[String, ConsoleEventServerPlugin]],
     val log: LoggingAdapter) {
-  def inputBlockers: Map[String, EventServerPlugin] =
-    plugins.getOrElse(EventServerPlugin.inputBlocker, Map()).toMap
+  def inputBlockers: Map[String, ConsoleEventServerPlugin] =
+    plugins.getOrElse(ConsoleEventServerPlugin.inputBlocker, Map()).toMap
 
-  def inputSniffers: Map[String, EventServerPlugin] =
-    plugins.getOrElse(EventServerPlugin.inputSniffer, Map()).toMap
+  def inputSniffers: Map[String, ConsoleEventServerPlugin] =
+    plugins.getOrElse(ConsoleEventServerPlugin.inputSniffer, Map()).toMap
 }
 
 object EventServerPluginContext extends Logging {
   def apply(log: LoggingAdapter): EventServerPluginContext = {
-    val plugins = mutable.Map[String, mutable.Map[String, EventServerPlugin]](
-      EventServerPlugin.inputBlocker -> mutable.Map(),
-      EventServerPlugin.inputSniffer -> mutable.Map())
-    val serviceLoader = ServiceLoader.load(classOf[EventServerPlugin])
+    val plugins = mutable.Map[String, mutable.Map[String, ConsoleEventServerPlugin]](
+      ConsoleEventServerPlugin.inputBlocker -> mutable.Map(),
+      ConsoleEventServerPlugin.inputSniffer -> mutable.Map())
+    val serviceLoader = ServiceLoader.load(classOf[ConsoleEventServerPlugin])
     serviceLoader foreach { service =>
       plugins(service.pluginType) += service.pluginName -> service
     }

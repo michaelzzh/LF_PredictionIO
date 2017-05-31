@@ -466,12 +466,12 @@ class  ConsoleEventServiceActor(
                 val pluginType = segments(0)
                 val pluginName = segments(1)
                 pluginType match {
-                  case EventServerPlugin.inputBlocker =>
+                  case ConsoleEventServerPlugin.inputBlocker =>
                     pluginContext.inputBlockers(pluginName).handleREST(
                       authData.appId,
                       authData.channelId,
                       pluginArgs)
-                  case EventServerPlugin.inputSniffer =>
+                  case ConsoleEventServerPlugin.inputSniffer =>
                     pluginsActorRef ? PluginsActor.HandleREST(
                       appId = authData.appId,
                       channelId = authData.channelId,

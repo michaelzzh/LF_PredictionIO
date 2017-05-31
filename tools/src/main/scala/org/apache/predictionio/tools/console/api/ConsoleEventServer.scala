@@ -961,7 +961,7 @@ class  EventServiceActor(
 /* message */
 case class StartServer(host: String, port: Int)
 
-class EventServerActor(
+class ConsoleEventServerActor(
     val eventClient: LEvents,
     val accessKeysClient: AccessKeys,
     val channelsClient: Channels,
@@ -1001,12 +1001,12 @@ object EventServer {
 
     val serverActor = system.actorOf(
       Props(
-        classOf[EventServerActor],
+        classOf[ConsoleEventServerActor],
         eventClient,
         accessKeysClient,
         channelsClient,
         config),
-      "EventServerActor"
+      "ConsoleEventServerActor"
     )
     if (config.stats) system.actorOf(Props[StatsActor], "StatsActor")
     system.actorOf(Props[PluginsActor], "PluginsActor")

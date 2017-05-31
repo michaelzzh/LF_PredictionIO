@@ -82,7 +82,7 @@ import java.security.SecureRandom
 import org.apache.commons.codec.binary.Base64
 import scala.collection.mutable.Queue
 
-class  EventServiceActor(
+class  ConsoleEventServiceActor(
     val eventClient: LEvents,
     val accessKeysClient: AccessKeys,
     val channelsClient: Channels,
@@ -967,12 +967,12 @@ class ConsoleEventServerActor(
     val channelsClient: Channels,
     val config: ConsoleEventServerConfig) extends Actor with ActorLogging {
   val child = context.actorOf(
-    Props(classOf[EventServiceActor],
+    Props(classOf[ConsoleEventServiceActor],
       eventClient,
       accessKeysClient,
       channelsClient,
       config),
-    "EventServiceActor")
+    "ConsoleEventServiceActor")
   implicit val system = context.system
 
   def receive: Actor.Receive = {

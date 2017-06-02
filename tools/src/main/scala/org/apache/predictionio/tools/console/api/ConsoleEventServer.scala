@@ -18,6 +18,14 @@
 
 package org.apache.predictionio.tools.console.api
 
+import org.apache.predictionio.tools.console.ConsoleArgs
+import org.apache.predictionio.tools.console.Console
+import org.apache.predictionio.tools.console.CommonArgs
+import org.apache.predictionio.tools.console.App
+import org.apache.predictionio.tools.console.AppArgs
+import org.apache.predictionio.tools.console.AccessKeyArgs
+import org.apache.predictionio.tools.console.DeployArgs
+
 import akka.event.Logging
 import sun.misc.BASE64Decoder
 
@@ -269,12 +277,13 @@ class  ConsoleEventServiceActor(
           val port = manifest.port
           Future{
             System.out.println(s"Starting up base engine ${engine} at port ${port}")
-            val stream = Process(Seq("pio", 
+            /**val stream = Process(Seq("pio", 
                                     "deploy", 
                                     s"--port $port", 
                                     s"--variant ${pio_root}/engines/${engine}/engine.json", 
-                                    s"--engine-id ${engine}")).lines
-            stream foreach println
+                                    s"--engine-id ${engine}")).lines**/
+            Console.deploy(ConsoleArgs(deploy = DeployArgs(port = port), common = CommonArgs(variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"))))
+            //stream foreach println
           }
         } getOrElse {
           error(s"base engine ${engine} not found")
@@ -286,9 +295,13 @@ class  ConsoleEventServiceActor(
     val id = java.util.UUID.randomUUID().toString
     val accessKey = generateAccessKey()
     Future{
-      Process(Seq("pio", "register", s"--engine-id ${id}", s"--base-engine-url ${pio_root}/engines/${baseEngine}", s"--base-engine-id $baseEngine"),
-        new File(s"${pio_root}/engines/${baseEngine}")).!
-      Process(Seq("pio", "app", "new", id, "--access-key", accessKey)).!
+      //Process(Seq("pio", "register", s"--engine-id ${id}", s"--base-engine-url ${pio_root}/engines/${baseEngine}", s"--base-engine-id $baseEngine"),
+      //  new File(s"${pio_root}/engines/${baseEngine}")).!
+      var ca = ConsoleArgs(common = CommonArgs(engineId = id, baseEngineURL = s"${pio_root}/engines/${baseEngine}", baseEngineId = s"$baseEngine"))
+      Console.registerEngineWithArgs(ca, id)
+      //Process(Seq("pio", "app", "new", id, "--access-key", accessKey)).!
+      ca = ConsoleArgs(common = CommonArgs(engineId = id), accessKey = AccessKeyArgs(accessKey = accessKey))
+      App.create(ca);
     }
     EngineAuthData(engineId = id, accessKey = accessKey)
   }
@@ -301,12 +314,16 @@ class  ConsoleEventServiceActor(
   }
 
   def deleteEngine(engineId: String):String = {
-    Process(Seq("pio", "app", "delete", engineId, "-f")).!
+    //Process(Seq("pio", "app", "delete", engineId, "-f")).!
+    val ca = ConsoleArgs(common = CommonArgs(engineId = engineId), app = AppArgs(force = true))
+    App.delete(ca)
     s"engine ${engineId} removed"
   }
 
   def deleteEngineData(engineId: String):String = {
-    Process(Seq("pio", "app", "data-delete", engineId, "-f")).!
+    //Process(Seq("pio", "app", "data-delete", engineId, "-f")).!
+    val ca = ConsoleArgs(common = CommonArgs(engineId = engineId), app = AppArgs(force = true))
+    App.dataDelete(ca)
     s"event data for ${engineId} cleared"
   }
 
@@ -325,7 +342,7 @@ class  ConsoleEventServiceActor(
         trainingLeft -= 1
         val training: Future[String] = Future {
           System.out.println(s"Training started for ${engineId}, number of training left is $trainingLeft")
-          val stream = Process(Seq(
+          /**val stream = Process(Seq(
             "pio", 
             "train", 
             s"--engine-id ${engineId}", 
@@ -337,7 +354,9 @@ class  ConsoleEventServiceActor(
           //stream foreach println
           for (line <- stream){
             output = line
-          }
+          }**/
+          val ca = ConsoleArgs(common = CommonArgs(variantJson = new File(s"${pio_root}/engines/engine-params/${engineId}.json"), engineId = engineId, baseEngineURL = s"${pio_root}/engines/${baseEngine}", baseEngineId = s"$baseEngine"))
+          Console.train(ca)
           engineId
         }
 
@@ -714,6 +733,11 @@ class  ConsoleEventServiceActor(
             }
           }
         }
+      }
+    }~
+    path("test"){
+      post{
+        complete(s"using ConsoleEventServer")
       }
     }~
     path("engine" / "train"){

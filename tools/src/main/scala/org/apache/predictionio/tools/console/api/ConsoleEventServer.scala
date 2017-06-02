@@ -282,7 +282,7 @@ class  ConsoleEventServiceActor(
                                     s"--port $port", 
                                     s"--variant ${pio_root}/engines/${engine}/engine.json", 
                                     s"--engine-id ${engine}")).lines**/
-            Console.deploy(ConsoleArgs(deploy = DeployArgs(port = port), common = CommonArgs(variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"))))
+            Console.deploy(ConsoleArgs(deploy = DeployArgs(port = port), common = CommonArgs(engineId = engine, variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"))))
             //stream foreach println
           }
         } getOrElse {
@@ -742,7 +742,7 @@ class  ConsoleEventServiceActor(
     }~
     path("engine" / "train"){
       import Json4sProtocol._
-      post{
+      get{
         handleExceptions(ConsoleCommon.exceptionHandler) {
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey) { _ =>

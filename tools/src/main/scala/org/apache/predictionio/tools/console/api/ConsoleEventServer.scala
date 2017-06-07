@@ -277,13 +277,13 @@ class  ConsoleEventServiceActor(
           val port = manifest.port
           Future{
             System.out.println(s"Starting up base engine ${engine} at port ${port}")
-            val stream = Process(Seq("pio", 
+            /**val stream = Process(Seq("pio", 
                                     "deploy", 
                                     s"--port $port", 
                                     s"--variant ${pio_root}/engines/${engine}/engine.json", 
                                     s"--engine-id ${engine}")).lines
-            //Console.deploy(ConsoleArgs(deploy = DeployArgs(port = port), common = CommonArgs(engineId = s"$engine", variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"))))
-            stream foreach println
+            **/Console.deploy(ConsoleArgs(deploy = DeployArgs(port = port), common = CommonArgs(engineId = s"$engine", variantJson = new File(s"${pio_root}/engines/${engine}/engine.json"))))
+            // stream foreach println
           }
         } getOrElse {
           error(s"base engine ${engine} not found")
@@ -454,110 +454,6 @@ class  ConsoleEventServiceActor(
       get {
         respondWithMediaType(MediaTypes.`application/json`) {
           complete(Map("status" -> "alive"))
-        }
-      }
-    } ~
-    path("plugins.json") {
-      import Json4sProtocol._
-      get {
-        respondWithMediaType(MediaTypes.`application/json`) {
-          complete {
-            Map("plugins" -> Map(
-              "inputblockers" -> pluginContext.inputBlockers.map { case (n, p) =>
-                n -> Map(
-                  "name" -> p.pluginName,
-                  "description" -> p.pluginDescription,
-                  "class" -> p.getClass.getName)
-              },
-              "inputsniffers" -> pluginContext.inputSniffers.map { case (n, p) =>
-                n -> Map(
-                  "name" -> p.pluginName,
-                  "description" -> p.pluginDescription,
-                  "class" -> p.getClass.getName)
-              }
-            ))
-          }
-        }
-      }
-    } ~
-    path("plugins" / Segments) { segments =>
-      get {
-        handleExceptions(ConsoleCommon.exceptionHandler) {
-          authenticate(withAccessKey) { authData =>
-            respondWithMediaType(MediaTypes.`application/json`) {
-              complete {
-                val pluginArgs = segments.drop(2)
-                val pluginType = segments(0)
-                val pluginName = segments(1)
-                pluginType match {
-                  case ConsoleEventServerPlugin.inputBlocker =>
-                    pluginContext.inputBlockers(pluginName).handleREST(
-                      authData.appId,
-                      authData.channelId,
-                      pluginArgs)
-                  case ConsoleEventServerPlugin.inputSniffer =>
-                    pluginsActorRef ? ConsolePluginsActor.HandleREST(
-                      appId = authData.appId,
-                      channelId = authData.channelId,
-                      pluginName = pluginName,
-                      pluginArgs = pluginArgs) map {
-                      _.asInstanceOf[String]
-                    }
-                }
-              }
-            }
-          }
-        }
-      }
-    } ~
-    path("events" / jsonPath ) { eventId =>
-
-      import Json4sProtocol._
-
-      get {
-        handleExceptions(ConsoleCommon.exceptionHandler) {
-          handleRejections(rejectionHandler) {
-            authenticate(withAccessKey) { authData =>
-              val appId = authData.appId
-              val channelId = authData.channelId
-              respondWithMediaType(MediaTypes.`application/json`) {
-                complete {
-                  logger.debug(s"GET event ${eventId}.")
-                  val data = eventClient.futureGet(eventId, appId, channelId).map { eventOpt =>
-                    eventOpt.map( event =>
-                      (StatusCodes.OK, event)
-                    ).getOrElse(
-                      (StatusCodes.NotFound, Map("message" -> "Not Found"))
-                    )
-                  }
-                  data
-                }
-              }
-            }
-          }
-        }
-      } ~
-      delete {
-        handleExceptions(ConsoleCommon.exceptionHandler) {
-          handleRejections(rejectionHandler) {
-            authenticate(withAccessKey) { authData =>
-              val appId = authData.appId
-              val channelId = authData.channelId
-              respondWithMediaType(MediaTypes.`application/json`) {
-                complete {
-                  logger.debug(s"DELETE event ${eventId}.")
-                  val data = eventClient.futureDelete(eventId, appId, channelId).map { found =>
-                    if (found) {
-                      (StatusCodes.OK, Map("message" -> "Found"))
-                    } else {
-                      (StatusCodes.NotFound, Map("message" -> "Not Found"))
-                    }
-                  }
-                  data
-                }
-              }
-            }
-          }
         }
       }
     } ~
@@ -740,11 +636,6 @@ class  ConsoleEventServiceActor(
         }
       }
     }~
-    path("test"){
-      post{
-        complete(s"using ConsoleEventServer")
-      }
-    }~
     path("engine" / "train"){
       import Json4sProtocol._
       post{
@@ -847,7 +738,7 @@ class  ConsoleEventServiceActor(
           }
         }
       }
-    } ~
+    } /**
     path("stats.json") {
 
       import Json4sProtocol._
@@ -977,7 +868,7 @@ class  ConsoleEventServiceActor(
         }
       }
 
-    }
+    } **/
 
   def receive: Actor.Receive = {
     startUpBaseEngines()

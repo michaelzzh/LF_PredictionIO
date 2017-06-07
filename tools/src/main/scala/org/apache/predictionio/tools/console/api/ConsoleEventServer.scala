@@ -444,7 +444,7 @@ class  ConsoleEventServiceActor(
     )
   )
 
-  lazy val statsActorRef = actorRefFactory.actorSelection("/user/StatsActor")
+  //lazy val statsActorRef = actorRefFactory.actorSelection("/user/StatsActor")
   lazy val pluginsActorRef = actorRefFactory.actorSelection("/user/PluginsActor")
 
   val route: Route =
@@ -482,9 +482,9 @@ class  ConsoleEventServiceActor(
                         channelId = channelId,
                         event = event)
                       val result = (StatusCodes.Created, Map("eventId" -> s"${id}"))
-                      if (config.stats) {
-                        statsActorRef ! Bookkeeping(appId, result._1, event)
-                      }
+                      //if (config.stats) {
+                      //  statsActorRef ! Bookkeeping(appId, result._1, event)
+                      //}
                       result
                     }
                     data
@@ -731,7 +731,7 @@ object ConsoleEventServer {
         config),
       "ConsoleEventServerActor"
     )
-    if (config.stats) system.actorOf(Props[ConsoleStatsActor], "ConsoleStatsActor")
+    //if (config.stats) system.actorOf(Props[ConsoleStatsActor], "ConsoleStatsActor")
     system.actorOf(Props[ConsolePluginsActor], "ConsolePluginsActor")
     serverActor ! StartServer(config.ip, config.port)
     system.awaitTermination()

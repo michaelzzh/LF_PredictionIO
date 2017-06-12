@@ -86,7 +86,8 @@ object App extends Logging {
               1
           }
         }
-        events.close()
+        // Not close the events after creating new app
+        //events.close()
         r
       } getOrElse {
         error(s"Unable to create new app.")
@@ -242,7 +243,8 @@ object App extends Logging {
       error(s"App ${ca.app.name} does not exist. Aborting.")
       1
     }
-    events.close()
+    // Not close the events after deleting app
+    // events.close()
     status
   }
 
@@ -324,7 +326,8 @@ object App extends Logging {
             }
             1
           }
-          events.close()
+          // Not close the events after deleting app
+          // events.close()
           info("Done.")
           r1 + r2
         }
@@ -413,7 +416,8 @@ object App extends Logging {
       error(s"App ${ca.app.name} does not exist. Aborting.")
       1
     }
-    events.close()
+    // Not close the events after deleting app
+    // events.close()
     status
   }
 

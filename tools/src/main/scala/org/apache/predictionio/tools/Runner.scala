@@ -103,7 +103,7 @@ object Runner extends Logging {
       argumentValue(ca.common.sparkPassThrough, "--deploy-mode").getOrElse("client")
     val master =
       argumentValue(ca.common.sparkPassThrough, "--master").getOrElse("local[*]")
-
+    info(0)
     (ca.common.scratchUri, deployMode, master) match {
       case (Some(u), "client", m) if m != "yarn-cluster" =>
         error("--scratch-uri cannot be set when deploy mode is client")
@@ -113,28 +113,28 @@ object Runner extends Logging {
         return 1
       case _ => Unit
     }
-
+    info(1)
     // Initialize HDFS API for scratch URI
     val fs = ca.common.scratchUri map { uri =>
       FileSystem.get(uri, new Configuration())
     }
     //val fs = ca.common.scratchUri
-
+    info(2)
     // Collect and serialize PIO_* environmental variables
     val pioEnvVars = sys.env.filter(kv => kv._1.startsWith("PIO_")).map(kv =>
       s"${kv._1}=${kv._2}"
     ).mkString(",")
-
+    info(3)
     // Location of Spark
     val sparkHome = ca.common.sparkHome.getOrElse(
       sys.env.getOrElse("SPARK_HOME", "."))
-
+    info(4)
     // Local path to PredictionIO assembly JAR
     val mainJar = handleScratchFile(
       fs,
       ca.common.scratchUri,
       console.Console.coreAssembly(ca.common.pioHome.get))
-
+    info(5)
     // Extra JARs that are needed by the driver
     val driverClassPathPrefix =
       argumentValue(ca.common.sparkPassThrough, "--driver-class-path") map { v =>
@@ -142,40 +142,40 @@ object Runner extends Logging {
       } getOrElse {
         Nil
       }
-
+    info(6)
     val extraClasspaths =
       driverClassPathPrefix ++ WorkflowUtils.thirdPartyClasspaths
-
+    info(7)
     // Extra files that are needed to be passed to --files
     val extraFiles = WorkflowUtils.thirdPartyConfFiles map { f =>
       handleScratchFile(fs, ca.common.scratchUri, new File(f))
     }
-
+    info(8)
     val deployedJars = extraJars map { j =>
       handleScratchFile(fs, ca.common.scratchUri, new File(j))
     }
-
+    info(9)
     val sparkSubmitCommand =
       Seq(Seq(sparkHome, "bin", "spark-submit").mkString(File.separator))
-
+    info(10)
     val sparkSubmitJars = if (extraJars.nonEmpty) {
       Seq("--jars", deployedJars.map(_.toString).mkString(","))
     } else {
       Nil
     }
-
+    info(11)
     val sparkSubmitFiles = if (extraFiles.nonEmpty) {
       Seq("--files", extraFiles.mkString(","))
     } else {
       Nil
     }
-
+    info(12)
     val sparkSubmitExtraClasspaths = if (extraClasspaths.nonEmpty) {
       Seq("--driver-class-path", extraClasspaths.mkString(":"))
     } else {
       Nil
     }
-
+    info(13)
     val sparkSubmitKryo = if (ca.common.sparkKryo) {
       Seq(
         "--conf",
@@ -183,9 +183,9 @@ object Runner extends Logging {
     } else {
       Nil
     }
-
+    info(14)
     val verbose = if (ca.common.verbose) Seq("--verbose") else Nil
-
+    info(15)
     val sparkSubmit = Seq(
       sparkSubmitCommand,
       ca.common.sparkPassThrough,

@@ -1473,7 +1473,7 @@ object Console extends Logging {
     string.stripMargin.replaceAll("\n", " ")
 
 
-  // Event serve code starts here
+  // Event server code starts here
   class  ConsoleEventServiceActor(
       val eventClient: LEvents,
       val accessKeysClient: AccessKeys,

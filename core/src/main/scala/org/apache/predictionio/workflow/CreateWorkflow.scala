@@ -243,8 +243,26 @@ object CreateWorkflow extends Logging {
 
       val engineInstances = Storage.getMetaDataEngineInstances
       val trainingAlreadyDone = engineInstances.getLatestCompleted(wfc.engineId, wfc.engineVersion, variantId) != None
-
       if(!wfc.preDeployment || !trainingAlreadyDone){
+        // parameterize certain paths
+        val wrappedPioEnvVars : Map[String, String] = {
+          var map : Map[String, String] = Map()
+          pioEnvVars.keySet.foreach { k =>
+            k match {
+              case "PIO_ROOT" => map += (k -> "$PIO_ROOT")
+              case "PIO_FS_BASEDIR" => map += (k ->"$HOME/.pio_store")
+              case "PIO_HOME" => map += (k-> "$PIO_ROOT/PredictionIO-0.10.0-incubating")
+              case "PIO_FS_ENGINESDIR" => map += (k -> "$HOME/.pio_store/engines")
+              case "PIO_FS_TMPDIR" => map += (k -> "$HOME/.pio_store/tmp")
+              case "PIO_CONF_DIR" => map += (k -> "$PIO_ROOT/PredictionIO-0.10.0-incubating/conf")
+              case _ => val v = pioEnvVars.get(k) match {
+                case Some(value : String) => map += (k -> value)
+                case None => map += (k -> "")
+              }          
+            }
+          }
+          map
+        }
         val engineInstance = EngineInstance(
         id = "",
         status = "INIT",
@@ -255,7 +273,7 @@ object CreateWorkflow extends Logging {
         engineVariant = variantId,
         engineFactory = engineFactory,
         batch = wfc.batch,
-        env = pioEnvVars,
+        env = wrappedPioEnvVars,
         sparkConf = workflowParams.sparkEnv,
         dataSourceParams =
           JsonExtractor.paramToJson(wfc.jsonExtractor, engineParams.dataSourceParams),
@@ -271,7 +289,7 @@ object CreateWorkflow extends Logging {
 
         CoreWorkflow.runTrain(
           wfc.preDeployment,
-          env = pioEnvVars,
+          env = wrappedPioEnvVars,
           params = workflowParams,
           engine = trainableEngine,
           engineParams = engineParams,

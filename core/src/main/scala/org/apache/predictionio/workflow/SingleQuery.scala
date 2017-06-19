@@ -210,10 +210,34 @@ object SingleQuery extends Logging {
   	}else{
   		engineInstance.engineFactory
   	}
-  	System.out.println(s"batch: ${batch}, executorEnv: ${engineInstance.env}, sparkEnv: ${engineInstance.sparkConf}")
+
+    val unwrappedEnv : Map[String, String] = {
+      var map : Map[String, String] = Map()
+      engineInstance.env.keySet.foreach { 
+        k => {
+          val v = engineInstance.env.get(k) match {
+            case Some(value: String) => {
+              if (value.startsWith("\\$PIO\\_ROOT")) {
+                map += (k -> value.replaceFirst("\\$PIO\\_ROOT", sys.env("PIO_ROOT")))
+              } 
+              else if (value.startsWith("\\$HOME")) {
+                map += (k -> value.replaceFirst("\\$HOME", sys.env("HOME")))
+              } 
+              else {
+                map += (k -> value)
+              }              
+            }
+            case None => map += (k -> "")
+          }
+        }
+      }
+      map
+    }
+
+  	System.out.println(s"batch: ${batch}, executorEnv: ${unwrappedEnv}, sparkEnv: ${engineInstance.sparkConf}")
   	val sparkContext = WorkflowContext(
   		batch = batch,
-  		executorEnv = engineInstance.env,
+  		executorEnv = unwrappedEnv,
   		mode = "Serving",
   		sparkEnv = engineInstance.sparkConf)
 

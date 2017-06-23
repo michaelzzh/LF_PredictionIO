@@ -35,7 +35,7 @@ object RunWorkflow extends Logging {
 
   // replace "$PIO_ROOT" in a file path with 
   // the actual PIO_ROOT environment variable
-  def getActualPath(filePath : String) : String = {
+  def unwrapFilePath(filePath : String) : String = {
     val unwrappedFilePath = filePath.replaceFirst("\\$PIO\\_ROOT", sys.env("PIO_ROOT"))
     unwrappedFilePath
   }
@@ -81,13 +81,13 @@ object RunWorkflow extends Logging {
     val mainJar =
       if (ca.build.uberJar) {
         if (deployMode == "cluster") {
-          em.files.map(s => getActualPath(s)).filter(_.startsWith("hdfs")).head
+          em.files.map(s => unwrapFilePath(s)).filter(_.startsWith("hdfs")).head
         } else {
-          em.files.map(s => getActualPath(s)).filterNot(_.startsWith("hdfs")).head
+          em.files.map(s => unwrapFilePath(s)).filterNot(_.startsWith("hdfs")).head
         }
       } else {
         if (deployMode == "cluster") {
-          em.files.map(s => getActualPath(s)).filter(_.contains("pio-assembly")).head
+          em.files.map(s => unwrapFilePath(s)).filter(_.contains("pio-assembly")).head
         } else {
           core.getCanonicalPath
         }
@@ -118,7 +118,7 @@ object RunWorkflow extends Logging {
         "--name",
         s"PredictionIO $workMode: ${em.id} ${em.version} (${ca.common.batch})") ++
       (if (!ca.build.uberJar) {
-        Seq("--jars", em.files.map(s => getActualPath(s)).mkString(","))
+        Seq("--jars", em.files.map(s => unwrapFilePath(s)).mkString(","))
       } else Seq()) ++
       (if (extraFiles.size > 0) {
         Seq("--files", extraFiles.mkString(","))
@@ -181,7 +181,7 @@ object RunWorkflow extends Logging {
   }
 
   def newRunWorkflow(ca: ConsoleArgs, em: EngineManifest): Int = {
-    val unwrappedEmFiles = em.files.map(s => getActualPath(s))
+    val unwrappedEmFiles = em.files.map(s => unwrapFilePath(s))
     val jarFiles = unwrappedEmFiles.map(new URI(_))
     val args = Seq(
       "--engine-id",

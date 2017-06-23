@@ -39,7 +39,7 @@ object RegisterEngine extends Logging {
   
   // assume the path is in the right format
   // replace the actual PIO_ROOT path in the file path with the string "$PIO_ROOT"
-  def appendHelper(filePath : String) : String = {
+  def wrapFilePath(filePath : String) : String = {
     var slashCount = 0
     var index = 0 // the index for the fifth slash in the string
     while (index < filePath.length && slashCount < 5) {
@@ -58,7 +58,7 @@ object RegisterEngine extends Logging {
     info(s"Registering engine ${manifest.id} ${manifest.version}")
     engineManifests.update(
       manifest.copy(files = engineFiles
-        .map(s => appendHelper(s.toURI.toString))), true)
+        .map(s => wrapFilePath(s.toURI.toString))), true)
   }
 
   def registerEngine(
@@ -78,7 +78,14 @@ object RegisterEngine extends Logging {
 
     engineManifests.update(
       engineManifest.copy(files = engineFiles
-        .map(s => appendHelper(s.toURI.toString))), true)
+        .map(s => wrapFilePath(s.toURI.toString))), true)
+  }
+
+  // replace "$PIO_ROOT" in a file path with 
+  // the actual PIO_ROOT environment variable
+  def unwrapFilePath(filePath : String) : String = {
+    val unwrappedFilePath = filePath.replaceFirst("\\$PIO\\_ROOT", sys.env("PIO_ROOT"))
+    unwrappedFilePath
   }
 
   def unregisterEngine(jsonManifest: File): Unit = {
@@ -100,7 +107,7 @@ object RegisterEngine extends Logging {
 
       em.files foreach { f =>
         // need to recover the right path
-        val path = new Path(f)
+        val path = new Path(unwrapFilePath(f))
         info(s"Removing ${f}")
         fs.delete(path, false)
       }

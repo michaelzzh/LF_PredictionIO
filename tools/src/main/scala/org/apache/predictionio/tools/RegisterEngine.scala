@@ -36,12 +36,29 @@ object RegisterEngine extends Logging {
   val engineManifests = Storage.getMetaDataEngineManifests
   implicit val formats = DefaultFormats + new EngineManifestSerializer
 
+  
+  // assume the path is in the right format
+  // replace the actual PIO_ROOT path in the file path with the string "$PIO_ROOT"
+  def wrapFilePath(filePath : String) : String = {
+    var slashCount = 0
+    var index = 0 // the index for the fifth slash in the string
+    while (index < filePath.length && slashCount < 5) {
+      if (filePath.charAt(index) == '/') {
+        slashCount += 1
+      }
+      index += 1
+    }
+    val newPath = "file:$PIO_ROOT/"++(filePath.substring(index))
+    newPath
+  }
+
   def registerEngineWithManifest(
     manifest: EngineManifest,
     engineFiles: Seq[File]): Unit = {
     info(s"Registering engine ${manifest.id} ${manifest.version}")
     engineManifests.update(
-      manifest.copy(files = engineFiles.map(_.toURI.toString)), true)
+      manifest.copy(files = engineFiles
+        .map(s => wrapFilePath(s.toURI.toString))), true)
   }
 
   def registerEngine(
@@ -58,8 +75,17 @@ object RegisterEngine extends Logging {
     val engineManifest = read[EngineManifest](jsonString)
 
     info(s"Registering engine ${engineManifest.id} ${engineManifest.version}")
+
     engineManifests.update(
-      engineManifest.copy(files = engineFiles.map(_.toURI.toString)), true)
+      engineManifest.copy(files = engineFiles
+        .map(s => wrapFilePath(s.toURI.toString))), true)
+  }
+
+  // replace "$PIO_ROOT" in a file path with 
+  // the actual PIO_ROOT environment variable
+  def unwrapFilePath(filePath : String) : String = {
+    val unwrappedFilePath = filePath.replaceFirst("\\$PIO\\_ROOT", sys.env("PIO_ROOT"))
+    unwrappedFilePath
   }
 
   def unregisterEngine(jsonManifest: File): Unit = {
@@ -80,7 +106,8 @@ object RegisterEngine extends Logging {
       val fs = FileSystem.get(conf)
 
       em.files foreach { f =>
-        val path = new Path(f)
+        // need to recover the right path
+        val path = new Path(unwrapFilePath(f))
         info(s"Removing ${f}")
         fs.delete(path, false)
       }

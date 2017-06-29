@@ -31,6 +31,14 @@ import scala.collection.mutable.ListBuffer
 import scala.sys.process._
 
 object RunServer extends Logging {
+
+  // replace "$PIO_ROOT" in a file path with 
+  // the actual PIO_ROOT environment variable
+  def unwrapFilePath(filePath : String) : String = {
+    val unwrappedFilePath = filePath.replaceFirst("\\$PIO\\_ROOT", sys.env("PIO_ROOT"))
+    unwrappedFilePath
+  }
+
   def runServer(
       ca: ConsoleArgs,
       core: File,
@@ -67,19 +75,19 @@ object RunServer extends Logging {
     val mainJar =
       if (ca.build.uberJar) {
         if (deployMode == "cluster") {
-          em.files.filter(_.startsWith("hdfs")).head
+          em.files.map(s => unwrapFilePath(s)).filter(_.startsWith("hdfs")).head
         } else {
-          em.files.filterNot(_.startsWith("hdfs")).head
+          em.files.map(s => unwrapFilePath(s)).filterNot(_.startsWith("hdfs")).head
         }
       } else {
         if (deployMode == "cluster") {
-          em.files.filter(_.contains("pio-assembly")).head
+          em.files.map(s => unwrapFilePath(s)).filter(_.contains("pio-assembly")).head
         } else {
           core.getCanonicalPath
         }
       }
 
-    val jarFiles = (em.files ++ Option(new File(ca.common.pioHome.get, "plugins")
+    val jarFiles = (em.files.map(s => unwrapFilePath(s)) ++ Option(new File(ca.common.pioHome.get, "plugins")
       .listFiles()).getOrElse(Array.empty[File]).map(_.getAbsolutePath)).mkString(",")
 
     val sparkSubmit =
@@ -150,7 +158,7 @@ object RunServer extends Logging {
     ca: ConsoleArgs,
     em: EngineManifest,
     engineInstanceId: String): Int = {
-    val jarFiles = em.files.map(new URI(_)) ++
+    val jarFiles = em.files.map(s => unwrapFilePath(s)).map(new URI(_)) ++
       Option(new File(ca.common.pioHome.get, "plugins").listFiles())
         .getOrElse(Array.empty[File]).map(_.toURI)
     val args = Seq(

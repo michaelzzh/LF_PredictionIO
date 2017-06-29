@@ -1,8 +1,7 @@
 #This script is for building and training base engines, 
 declare -A engines
 engines["baseClassification"]=8080
-engines["baseTextClassification"]=9000
-engines["baseLinearReg"]=9999
+engines["baseLinearReg"]=9000
 
 for engine in ${!engines[@]}
 do

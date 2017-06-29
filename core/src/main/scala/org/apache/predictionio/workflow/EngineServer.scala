@@ -603,7 +603,7 @@ class EngineServerActor[Q, P](
                 "groupId" -> resultData.groupId,
                 "status" -> resultData.status,
                 "progress" -> resultData.progress,
-                "predictions" -> resultData.predictions.map(re => Map("queryId" -> re.queryId, "resultString" -> re.resultString))
+                "predictions" -> resultData.predictions.map(re => Map("queryId" -> re.queryId, "result" -> re.resultString))
               )
               respondWithMediaType(`application/json`) {
                 complete(formatedData)

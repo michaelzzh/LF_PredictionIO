@@ -40,15 +40,7 @@ object RegisterEngine extends Logging {
   // assume the path is in the right format
   // replace the actual PIO_ROOT path in the file path with the string "$PIO_ROOT"
   def wrapFilePath(filePath : String) : String = {
-    var slashCount = 0
-    var index = 0 // the index for the fifth slash in the string
-    while (index < filePath.length && slashCount < 5) {
-      if (filePath.charAt(index) == '/') {
-        slashCount += 1
-      }
-      index += 1
-    }
-    val newPath = "file:$PIO_ROOT/"++(filePath.substring(index))
+    val newPath = "file:$PIO_ROOT/"++(filePath.substring(filePath.indexOf("engines")))
     newPath
   }
 

@@ -100,7 +100,7 @@ class  EventServiceActor(
   val pio_root = sys.env("PIO_ROOT")
   //val pio_root = "/$HOME/PredictionIO/LFPredictionIO/apache-predictionio-0.10.0-incubating"
 
-  val MaxNumberOfEventsPerBatchRequest = 50
+  val MaxNumberOfEventsPerBatchRequest = 2000
 
   val logger = Logging(context.system, this)
 

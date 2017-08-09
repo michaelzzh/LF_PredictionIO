@@ -484,7 +484,6 @@ class EngineServerActor[Q, P](
       modelsFromEngineInstance,
       params = WorkflowParams()
     )
-
     //val newId = java.util.UUID.randomUUID().toString
     var groupHistory = QueryGroupHistory(groupId = "",
                                         engineId = engineId,
@@ -513,7 +512,6 @@ class EngineServerActor[Q, P](
                                         query = queryString,
                                         result = "")
         val queryHistoryId = queryHistories.insert(queryHistory)
-
         // Extract Query from Json
         val query = JsonExtractor.extract(
           jsonExtractorOption,
@@ -527,7 +525,6 @@ class EngineServerActor[Q, P](
           query,
           algorithms.head.querySerializer,
           algorithms.head.gsonTypeAdapterFactories)
-
         // Deploy logic. First call Serving.supplement, then Algo.predict,
         // finally Serving.serve.
         val supplementedQuery = serving.supplementBase(query)
@@ -543,21 +540,16 @@ class EngineServerActor[Q, P](
           prediction,
           algorithms.head.querySerializer,
           algorithms.head.gsonTypeAdapterFactories)
-
         val result = predictionJValue
-
         val pluginResult =
           pluginContext.outputBlockers.values.foldLeft(result) { case (r, p) =>
             p.process(engineInstance, queryJValue, r, pluginContext)
           }
-
         val newHist = queryHistory.copy(
                         id = queryHistoryId,
                         status = "COMPLETED",
                         result = compact(render(pluginResult)))
-
         queryHistories.update(newHist)
-
         val resultEntry = ResultEntry(queryId = queryId,
                                     resultString = compact(render(pluginResult)))
         queryId += 1
@@ -573,7 +565,6 @@ class EngineServerActor[Q, P](
           queryGroupHistories.update(groupHistory)                      
         }
       }
-
       groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0)
       queryGroupHistories.update(groupHistory)
                 
@@ -608,11 +599,16 @@ class EngineServerActor[Q, P](
 
               queryGroupHistories.get(queryGroupId, engineId) map { groupHistory => 
                 if(groupHistory.status == "COMPLETED"){
+
                     responseList = queryHistories.getGroup(groupHistory.groupId).map(qh => ResultEntry(queryId = qh.queryId, resultString = qh.result))
                     resultData = ResultData(groupId = queryGroupId,
                                             status = "COMPLETED",
                                             progress = 1.0,
                                             predictions = responseList)
+                    // remove queryhistories
+                    queryHistories.getGroup(queryGroupId).map(qh => queryHistories.delete(qh.queryId, queryGroupId))
+                    // remove querygrouphistories
+                    queryGroupHistories.delete(groupHistory.groupId, groupHistory.engineId)
                 }else{
                   resultData = ResultData(groupId = queryGroupId,
                                           status = groupHistory.status,

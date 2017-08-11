@@ -608,13 +608,16 @@ class EngineServerActor[Q, P](
                                             predictions = responseList,
                                             finishTime = groupHistory.finishTime)
                     // remove queryhistories & querygrouphistories if more than 10 groups exist
+                    // until 10 left?
                     queryGroupHistories.count() match {
                       case Some(value : Int) => {
-                        if (value > 10) {
+                        var count = value
+                        while (count > 10) {
                         //queryGroupHistories.delete(groupHistory.groupId, groupHistory.engineId)
                           queryGroupHistories.deleteOldest() match {
                             case Some(value : String) => queryHistories.getGroup(value).map(qh => queryHistories.delete(qh.queryId, value))
-                          } 
+                          }
+                          count = count-1
                         }
                       }
                     }

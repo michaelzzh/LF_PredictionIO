@@ -488,7 +488,8 @@ class EngineServerActor[Q, P](
     var groupHistory = QueryGroupHistory(groupId = "",
                                         engineId = engineId,
                                         status = "INIT",
-                                        progress = 0.0)
+                                        progress = 0.0,
+                                        finishTime = DateTime.now())
     val newId = queryGroupHistories.insert(groupHistory)
     val resultData = ResultData(groupId = newId,
                             status = groupHistory.status,
@@ -565,7 +566,7 @@ class EngineServerActor[Q, P](
           queryGroupHistories.update(groupHistory)                      
         }
       }
-      groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0)
+      groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0, finishTime = DateTime.now())
       queryGroupHistories.update(groupHistory)
                 
       val queryEndTime = DateTime.now
@@ -604,11 +605,19 @@ class EngineServerActor[Q, P](
                     resultData = ResultData(groupId = queryGroupId,
                                             status = "COMPLETED",
                                             progress = 1.0,
-                                            predictions = responseList)
-                    // remove queryhistories
-                    queryHistories.getGroup(queryGroupId).map(qh => queryHistories.delete(qh.queryId, queryGroupId))
-                    // remove querygrouphistories
-                    queryGroupHistories.delete(groupHistory.groupId, groupHistory.engineId)
+                                            predictions = responseList,
+                                            finishTime = groupHistory.finishTime)
+                    // remove queryhistories & querygrouphistories if more than 10 groups exist
+                    queryGroupHistories.count() match {
+                      case Some(value : Int) => {
+                        if (value > 10) {
+                        //queryGroupHistories.delete(groupHistory.groupId, groupHistory.engineId)
+                          queryGroupHistories.deleteOldest() match {
+                            case Some(value : String) => queryHistories.getGroup(value).map(qh => queryHistories.delete(qh.queryId, value))
+                          } 
+                        }
+                      }
+                    }
                 }else{
                   resultData = ResultData(groupId = queryGroupId,
                                           status = groupHistory.status,

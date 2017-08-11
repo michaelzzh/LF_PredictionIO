@@ -3,6 +3,8 @@ package org.apache.predictionio.data.storage
 import com.github.nscala_time.time.Imports._
 import org.apache.predictionio.annotation.DeveloperApi
 import org.json4s._
+import scalikejdbc._
+
 
 /** :: DeveloperApi ::
   * DataAccess object for queryGroupHistories. Past query groups can be retrieved using groupId and engineId. 
@@ -34,7 +36,7 @@ trait QueryGroupHistories {
 
 	def count(): Option[Int]
 
-	def deleteOldest(): Option[String]
+	def deleteSomeOldest(queryHistoriesTableName : SQLSyntax, limit : Int): Unit
 }
 
 @DeveloperApi

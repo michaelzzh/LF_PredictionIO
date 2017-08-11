@@ -2,6 +2,7 @@ package org.apache.predictionio.data.storage
 
 import org.apache.predictionio.annotation.DeveloperApi
 import org.json4s._
+import scalikejdbc._
 
 /** :: DeveloperApi ::
   * Provides a way to discover historic queries by queryIds
@@ -24,6 +25,8 @@ case class QueryHistory(
 
 @DeveloperApi
 trait QueryHistories {
+	val tableName : SQLSyntax
+
 	def insert(queryHistory: QueryHistory): String
 
 	def get(queryId: Int, groupId: String): Option[QueryHistory]

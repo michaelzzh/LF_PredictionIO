@@ -75,17 +75,17 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
     sql"SELECT count(*) FROM $tableName".map(rs => rs.int("count")).single().apply()
   }
 
-  def deleteOldest(): Option[String] = DB localTx { implicit session => 
-    val groupId = sql"SELECT groupid FROM $tableName ORDER BY finishtime".map(rs => rs.string("groupid")).first().apply()
+  def deleteSomeOldest(queryHistoriesTableName : SQLSyntax, limit : Int): Unit = DB localTx { implicit session => 
     sql"""
+    DELETE FROM $queryHistoriesTableName WHERE groupid IN
+    (SELECT groupid FROM $tableName ORDER BY finishtime LIMIT $limit);
     DELETE FROM $tableName
     WHERE ctid IN (
     SELECT ctid
     FROM $tableName
     ORDER BY finishtime
-    LIMIT 1
+    LIMIT $limit
     )""".update().apply()
-    groupId
   }
 
   /** Convert JDBC results to [[ClientManfiest]] */

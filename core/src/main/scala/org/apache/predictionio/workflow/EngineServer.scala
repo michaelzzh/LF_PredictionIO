@@ -566,7 +566,7 @@ class EngineServerActor[Q, P](
           queryGroupHistories.update(groupHistory)                      
         }
       }
-      groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0)
+      groupHistory = groupHistory.copy(groupId = newId, status = "COMPLETED", progress = 1.0, finishTime = DateTime.now())
       queryGroupHistories.update(groupHistory)
                 
       val queryEndTime = DateTime.now
@@ -605,12 +605,17 @@ class EngineServerActor[Q, P](
                     resultData = ResultData(groupId = queryGroupId,
                                             status = "COMPLETED",
                                             progress = 1.0,
-                                            predictions = responseList)
-                    // remove the oldest query(group)histories when more than 10 existing query group histories
-                    // 
-                    queryHistories.getGroup(queryGroupId).map(qh => queryHistories.delete(qh.queryId, queryGroupId))
-                    // remove querygrouphistories
-                    queryGroupHistories.delete(groupHistory.groupId, groupHistory.engineId)
+                                            predictions = responseList,
+                                            finishTime = groupHistory.finishTime)
+                    // remove queryhistories & querygrouphistories if more than 10 groups exist
+                    // remove the oldest groups until only 10 left
+                    queryGroupHistories.count() match {
+                      case Some(value : Int) => {
+                        if (value > 10) {
+                          queryGroupHistories.deleteSomeOldest(queryHistories.tableName, value-10)
+                        }
+                      }
+                    }
                 }else{
                   resultData = ResultData(groupId = queryGroupId,
                                           status = groupHistory.status,

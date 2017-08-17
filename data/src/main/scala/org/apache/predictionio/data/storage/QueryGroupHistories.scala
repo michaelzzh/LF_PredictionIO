@@ -3,6 +3,8 @@ package org.apache.predictionio.data.storage
 import com.github.nscala_time.time.Imports._
 import org.apache.predictionio.annotation.DeveloperApi
 import org.json4s._
+import scalikejdbc._
+
 
 /** :: DeveloperApi ::
   * DataAccess object for queryGroupHistories. Past query groups can be retrieved using groupId and engineId. 
@@ -31,6 +33,10 @@ trait QueryGroupHistories {
 	def update(queryInfo: QueryGroupHistory): Unit
 
 	def delete(groupId: String, engineId: String): Unit
+
+	def count(): Option[Int]
+
+	def deleteSomeOldest(queryHistoriesTableName : SQLSyntax, limit : Int): Unit
 }
 
 @DeveloperApi
@@ -43,14 +49,14 @@ class QueryGroupHistorySerializer
 				engineId = "",
 				status = "",
 				progress = 0.0,
-				startTime = DateTime.now())
+				finishTime = DateTime.now())
 			fields.foldLeft(seed) {case (queryGroupHistory, field) =>
 				field match {
 					case JField("groupId", JString(groupId)) => queryGroupHistory.copy(groupId = groupId)
 					case JField("engineId", JString(engineId)) => queryGroupHistory.copy(engineId = engineId)
 					case JField("status", JString(status)) => queryGroupHistory.copy(status = status)
 					case JField("query", JDouble(progress)) => queryGroupHistory.copy(progress = progress)
-					case JField("startTime", JString(finishTime)) => queryGroupHistory.copy(finishTime = Utils.stringToDateTime(finishTime))
+					case JField("finishTime", JString(finishTime)) => queryGroupHistory.copy(finishTime = Utils.stringToDateTime(finishTime))
 					case _ => queryGroupHistory
 				}
 			}
@@ -61,6 +67,7 @@ class QueryGroupHistorySerializer
 				JField("groupId", JString(queryGroupHistory.groupId)) ::
 				JField("status", JString(queryGroupHistory.status)) ::
 				JField("progress", JDouble(queryGroupHistory.progress)) ::
+				JField("finishTime", JString(queryGroupHistory.finishTime.toString)) ::
 				Nil)
 	}
 ))

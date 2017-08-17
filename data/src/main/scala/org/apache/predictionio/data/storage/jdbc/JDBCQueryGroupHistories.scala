@@ -17,7 +17,8 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
       groupid varchar(100) not null primary key,
       engineid text not null,
       status text not null,
-      progress real not null)""".execute().apply()
+      progress real not null,
+      finishtime timestamp without time zone default now())""".execute().apply()
   }
 
   def insert(i: QueryGroupHistory): String = DB localTx { implicit session =>
@@ -27,7 +28,8 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
       ${id},
       ${i.engineId},
       ${i.status},
-      ${i.progress})""".update().apply()
+      ${i.progress},
+      ${i.finishTime})""".update().apply()
     id
   }
 
@@ -37,7 +39,8 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
       groupid,
       engineid,
       status,
-      progress
+      progress,
+      finishtime
     FROM $tableName WHERE groupid = $groupId AND engineid = $engineId""".map(resultToQueryGroupHistory).single().apply()
   }
 
@@ -47,7 +50,8 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
       groupid,
       engineid,
       status,
-      progress
+      progress,
+      finishtime
     FROM $tableName
     WHERE
       groupid = $groupId AND 
@@ -67,12 +71,30 @@ class JDBCQueryGroupHistories(client: String, config: StorageClientConfig, prefi
     sql"DELETE FROM $tableName WHERE groupid = $groupId AND engineid = $engineId".update().apply()
   }
 
+  def count(): Option[Int] = DB localTx { implicit session =>
+    sql"SELECT count(*) FROM $tableName".map(rs => rs.int("count")).single().apply()
+  }
+
+  def deleteSomeOldest(queryHistoriesTableName : SQLSyntax, limit : Int): Unit = DB localTx { implicit session => 
+    sql"""
+    DELETE FROM $queryHistoriesTableName WHERE groupid IN
+    (SELECT groupid FROM $tableName ORDER BY finishtime LIMIT $limit);
+    DELETE FROM $tableName
+    WHERE ctid IN (
+    SELECT ctid
+    FROM $tableName
+    ORDER BY finishtime
+    LIMIT $limit
+    )""".update().apply()
+  }
+
   /** Convert JDBC results to [[ClientManfiest]] */
   def resultToQueryGroupHistory(rs: WrappedResultSet): QueryGroupHistory = {
     QueryGroupHistory(
       groupId = rs.string("groupid"),
       engineId = rs.string("engineid"),
       status = rs.string("status"),
-      progress = rs.double("progress"))
+      progress = rs.double("progress"),
+      finishTime = rs.jodaDateTime("finishtime"))
   }
 }

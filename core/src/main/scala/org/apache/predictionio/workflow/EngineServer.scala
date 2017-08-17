@@ -488,7 +488,8 @@ class EngineServerActor[Q, P](
     var groupHistory = QueryGroupHistory(groupId = "",
                                         engineId = engineId,
                                         status = "INIT",
-                                        progress = 0.0)
+                                        progress = 0.0,
+                                        finishTime = DateTime.now())
     val newId = queryGroupHistories.insert(groupHistory)
     val resultData = ResultData(groupId = newId,
                             status = groupHistory.status,
@@ -605,7 +606,8 @@ class EngineServerActor[Q, P](
                                             status = "COMPLETED",
                                             progress = 1.0,
                                             predictions = responseList)
-                    // remove queryhistories
+                    // remove the oldest query(group)histories when more than 10 existing query group histories
+                    // 
                     queryHistories.getGroup(queryGroupId).map(qh => queryHistories.delete(qh.queryId, queryGroupId))
                     // remove querygrouphistories
                     queryGroupHistories.delete(groupHistory.groupId, groupHistory.engineId)

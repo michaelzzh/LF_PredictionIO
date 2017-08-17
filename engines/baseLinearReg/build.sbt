@@ -4,7 +4,7 @@ assemblySettings
 
 name := "template-scala-parallel-vanilla"
 
-organization := "io.prediction"
+organization := "org.apache.predictionio"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio"     %% "apache-predictionio-core"   % "0.10.0-incubating" % "provided",

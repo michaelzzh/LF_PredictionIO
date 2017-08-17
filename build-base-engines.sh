@@ -2,6 +2,7 @@
 declare -A engines
 engines["baseClassification"]=8080
 engines["baseLinearReg"]=9000
+engines["baseLogistic"]=9090
 
 for engine in ${!engines[@]}
 do

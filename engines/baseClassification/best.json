@@ -1,0 +1,32 @@
+{
+  "id":"com.laserfiche.RecallEvaluation$ 2017-08-28T10:04:06.129-07:00",
+  "description":"",
+  "engineFactory":"com.laserfiche.RecallEvaluation$",
+  "datasource":{
+    "name":"",
+    "params":{
+      "appName":"8af4740d-c9c6-48a0-a784-93649ca35fa7",
+      "evalK":5
+    }
+  },
+  "preparator":{
+    "name":"",
+    "params":{
+      
+    }
+  },
+  "algorithms":[
+    {
+      "name":"naive",
+      "params":{
+        "lambda":1.0
+      }
+    }
+  ],
+  "serving":{
+    "name":"",
+    "params":{
+      
+    }
+  }
+}

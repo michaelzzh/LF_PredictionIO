@@ -317,7 +317,7 @@ object Console extends Logging {
         text("Kick off an evaluation using an engine. This will produce an\n" +
           "engine instance. This command will pass all pass-through\n" +
           "arguments to its underlying spark-submit command.").
-        action { (_, c) =>
+        action { (_, c) => 
           c.copy(commands = c.commands :+ "eval")
         } children(
           arg[String]("<evaluation-class>") action { (x, c) =>

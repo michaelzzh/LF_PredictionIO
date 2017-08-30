@@ -71,7 +71,7 @@ class DataSource(val dsp: DataSourceParams)
       // entity ID and its aggregated properties
       .map { case (entityId, properties) =>
         try {
-          LabeledPoint(properties.get[Double]("labels"),
+          LabeledPoint(properties.get[Double]("label"),
             Vectors.dense(
               properties.get[Array[Double]]("features")
             )
@@ -93,7 +93,6 @@ class DataSource(val dsp: DataSourceParams)
     (0 until evalK).map { idx =>
       val trainingPoints = indexedPoints.filter(_._2 % evalK != idx).map(_._1)
       val testingPoints = indexedPoints.filter(_._2 % evalK == idx).map(_._1)
-
       (
         new TrainingData(trainingPoints),
         new EmptyEvaluationInfo(),

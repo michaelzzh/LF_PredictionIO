@@ -387,7 +387,7 @@ class  EventServiceActor(
   //BEGIN NEW CODE
 
   def evalEngine(evalInfo: EvalInput) = {
-    if(evalLeft > 0 && (evalQueue.size == 0 || evalInfo.engineData.engineId == "")){
+    if(evalLeft > 0 && (evalQueue.size == 0 || (evalInfo.engineData.engineId)== "")){
       var engineId = evalInfo.engineData.engineId
       metricToUse = evalInfo.metric
       if(engineId == ""){
@@ -404,7 +404,7 @@ class  EventServiceActor(
           System.out.println(s"Evaluation started for ${engineId}, number of evaluation left is $evalLeft")
           val stream = Process(Seq(
             "pio", 
-            "eval com.laserfiche." + metricToUse + "Evaluation com.laserfiche.EngineParamsList", 
+            "eval com.laserfiche.${metricToUse}Evaluation com.laserfiche.EngineParamsList", 
             s"--engine-id ${engineId}", 
             s"--base-engine-url ${pio_root}/engines/${baseEngine}", 
             s"--base-engine-id ${baseEngine}",
@@ -412,7 +412,7 @@ class  EventServiceActor(
           new File(s"${pio_root}/engines/${baseEngine}")).lines
           //stream foreach println
           val evaluation_id_pattern = ".* Starting evaluation instance ID: (.*)".r
-          val metric_pattern = (".*"+ metricToUse + ": (.*)").r
+          val metric_pattern = (".*"+metricToUse+": (.*)").r
 
           for (line <- stream){
             println(line)
@@ -441,12 +441,13 @@ class  EventServiceActor(
       }
     }else{
       if(evalInfo.engineData.engineId != ""){
+        var engineId = evalInfo.engineData.engineId
         val manifests = Storage.getMetaDataEngineManifests
-          manifests.get(evalInfo.engineData.engineId, evalInfo.engineData.engineId) map {manifest =>
+          manifests.get(engineId, engineId) map {manifest =>
             val baseEngine = manifest.baseEngine 
             val newManifest = manifest.copy(trainingStatus = "INIT")
             manifests.update(newManifest)
-            System.out.println(s"Training queued for ${evalInfo.engineData.engineId}")
+            System.out.println(s"Training queued for ${engineId}")
             evalQueue.enqueue(evalInfo.engineData)
         }
         
@@ -854,7 +855,7 @@ class  EventServiceActor(
               entity(as[EvalInput]) {data =>
                 complete {
                   evalEngine(data)
-                  s"evaluation started for engine ${data.engineData.engineId}"
+                  s"evaluation started"
                 }
               }
             }

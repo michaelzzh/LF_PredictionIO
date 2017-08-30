@@ -153,6 +153,7 @@ object CoreWorkflow {
     } else {
       val evaluatedEvaluationInstance = evaluationInstance.copy(
         status = "EVALCOMPLETED",
+
         id = evaluationInstanceId,
         endTime = DateTime.now,
         evaluatorResults = evaluatorResult.toOneLiner,

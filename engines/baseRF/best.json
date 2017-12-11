@@ -1,11 +1,11 @@
 {
-  "id":"com.laserfiche.RecallEvaluation$ 2017-10-05T09:48:06.916-07:00",
+  "id":"com.laserfiche.RecallEvaluation$ 2017-12-11T08:31:00.790-08:00",
   "description":"",
   "engineFactory":"com.laserfiche.RecallEvaluation$",
   "datasource":{
     "name":"",
     "params":{
-      "appName":"8af4740d-c9c6-48a0-a784-93649ca35fa7",
+      "appName":"af3a6798-c7bc-44d6-be1e-3e3d7f5b6533",
       "evalK":5
     }
   },
@@ -17,9 +17,14 @@
   },
   "algorithms":[
     {
-      "name":"naive",
+      "name":"randomforest",
       "params":{
-        "lambda":100.0
+        "numClasses":2,
+        "numTrees":100,
+        "featureSubsetStrategy":"auto",
+        "impurity":"gini",
+        "maxDepth":5,
+        "maxBins":100
       }
     }
   ],

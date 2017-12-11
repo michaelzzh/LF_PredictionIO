@@ -1,8 +1,13 @@
+#!/bin/bash
+
 #This script is for building and training base engines, 
 declare -A engines
 engines["baseClassification"]=8080
 engines["baseLinearReg"]=9000
 engines["baseLogistic"]=9090
+engines["baseRF"]=9080
+engines["baseGBRT"]=9070
+engines["baseMultiLayer"]=8070
 
 for engine in ${!engines[@]}
 do

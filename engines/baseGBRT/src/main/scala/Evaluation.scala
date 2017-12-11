@@ -21,7 +21,7 @@ case class Accuracy()
 
 object AccuracyEvaluation extends Evaluation {
   // Define Engine and Metric used in Evaluation
-  engineMetric = (ClassificationEngine(), Accuracy())
+  engineMetric = (GBRTClassificationEngine(), Accuracy())
 }
 
 case class Recall()
@@ -49,14 +49,14 @@ case class Recall()
 
 object RecallEvaluation extends Evaluation {
   // Define Engine and Metric used in Evaluation
-  engineMetric = (ClassificationEngine(), Recall())
+  engineMetric = (GBRTClassificationEngine(), Recall())
 }
 
 
 object EngineParamsList extends EngineParamsGenerator {
   val fname = "engineId"
   var eId = ""
-  for (line <- Source.fromFile("/home/dev/PredictionIO/LF_PredictionIO/engines/baseClassification/" + fname).getLines) {
+  for (line <- Source.fromFile("/home/dev/PredictionIO/LF_PredictionIO/engines/baseGBRT/" + fname).getLines) {
     eId = line
   }
   // Define list of EngineParams used in Evaluation
@@ -70,9 +70,10 @@ object EngineParamsList extends EngineParamsGenerator {
   // Second, we specify the engine params list by explicitly listing all
   // algorithm parameters. In this case, we evaluate 3 engine params, each with
   // a different algorithm params value.
+
   var hpfile = "hyperParams"
   var hPs = new ListBuffer[Seq[String]]()
-  for (line <- Source.fromFile("/home/dev/PredictionIO/LF_PredictionIO/engines/baseClassification/" + hpfile).getLines) {
+  for (line <- Source.fromFile("/home/dev/PredictionIO/LF_PredictionIO/engines/baseGBRT/" + hpfile).getLines) {
     hPs += line.replaceAll(" ","").split(",").toList
   }
 
@@ -83,6 +84,16 @@ object EngineParamsList extends EngineParamsGenerator {
     runningCP
   }
 
-  engineParamsList = for (i <- List.range(0,hPs.length)) yield baseEP.copy(algorithmParamsList = Seq(("naive", AlgorithmParams(hPs(i)(0).toDouble))))
+  var first = new ListBuffer[Seq[String]]
+
+  for {i <- hPs(0)} first += Seq(i)
+
+  var runningCross = crossProduct(first, hPs(1))
+
+  for {i <- List.range(2, hPs.length)} runningCross = crossProduct(runningCross, hPs(i))
+
+  println(runningCross)
+
+  engineParamsList = for (i <- List.range(0,runningCross.length)) yield baseEP.copy(algorithmParamsList = Seq(("gbrt", AlgorithmParams(runningCross(i)(0).toInt,runningCross(i)(1).toInt,runningCross(i)(2).toInt))))
 }
 

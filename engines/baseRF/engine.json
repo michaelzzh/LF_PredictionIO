@@ -1,0 +1,25 @@
+{
+  "id": "base",
+  "description": "Default settings",
+  "engineFactory": "com.laserfiche.RFClassificationEngine",
+  "datasource": {
+    "params": {
+      "appName": "INVALID_APP_NAME"
+    }
+  },
+  "algorithms": [
+  {
+    "name": "randomforest",
+    "params": {
+      "numClasses": 2,
+      "numTrees": 100,
+      "featureSubsetStrategy": "auto",
+      "impurity": "gini",
+      "maxDepth": 3,
+      "maxBins": 50
+    }
+  }
+]
+}
+
+

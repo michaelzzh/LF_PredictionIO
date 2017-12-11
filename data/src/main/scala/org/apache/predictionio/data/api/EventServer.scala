@@ -390,6 +390,7 @@ class  EventServiceActor(
     if(evalLeft > 0 && (evalQueue.size == 0 || evalInfo.engineData.engineId == "")){
       var engineId = evalInfo.engineData.engineId
       metricToUse = evalInfo.metric
+
       if(engineId == ""){
         engineId = evalQueue.dequeue().engineId
         System.out.println(s"Grabbed $engineId from queue")
@@ -503,8 +504,9 @@ class  EventServiceActor(
   def getTrainStatus(engineId: String):String = {
     val manifests = Storage.getMetaDataEngineManifests
     var status = ""
+    val lines = scala.io.Source.fromFile("/home/dev/PredictionIO/LF_PredictionIO/engines/baseRF/decision_trees.txt", "utf-8").getLines.mkString
     manifests.get(engineId, engineId) map {
-      em => status = em.trainingStatus   
+      em => status = em.trainingStatus + "___" + lines 
     } getOrElse {
       error(s"No engine manifest found for $engineId")
     }
@@ -853,6 +855,9 @@ class  EventServiceActor(
             authenticate(withAccessKey) { _ =>
               entity(as[EvalInput]) {data =>
                 complete {
+                  val pw = new PrintWriter(new File("/home/dev/PredictionIO/LF_PredictionIO/engines/" + data.engineData.baseEngine + "/engineId"))
+                  pw.write(data.engineData.engineId)
+                  pw.close
                   evalEngine(data)
                   s"evaluation started for engine ${data.engineData.engineId}"
                 }
@@ -888,12 +893,12 @@ class  EventServiceActor(
           handleRejections(rejectionHandler) {
             authenticate(withAccessKey){ _ =>
               entity(as[EngineData]) {data =>
-                val st = getEvalStatus(eval_id)
-                val formatedData = Map("status" -> st)
+                var st = getEvalStatus(eval_id)
                 if (st != "") {
                   eval_id = ""
                   metric = ""
                 }
+                val formatedData = Map("status" -> st)
                 respondWithMediaType(MediaTypes.`application/json`) {
                   complete(formatedData)
                 }

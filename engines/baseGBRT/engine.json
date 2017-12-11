@@ -1,0 +1,21 @@
+
+{
+  "id": "base",
+  "description": "Default settings",
+  "engineFactory": "com.laserfiche.GBRTClassificationEngine",
+  "datasource": {
+    "params": {
+        "appName": "INVALID_APP_NAME"
+    }
+  },
+  "algorithms": [
+    {
+      "name": "gbrt",
+      "params": {
+          "numIterations": 3,
+          "numClasses": 2,
+          "maxDepth": 5
+      }
+    }
+  ]
+}
